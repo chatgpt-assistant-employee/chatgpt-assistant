@@ -359,7 +359,8 @@ app.post('/auth/register', async (req, res) => {
             data: { email, passwordHash, verificationToken },
         });
 
-        const verificationUrl = `https://chatgpt-assistant-rho.vercel.app/verify-email?token=${verificationToken}`;
+
+        const verificationUrl = `${process.env.APP_URL}/verify-email?token=${verificationToken}`;
         await postmarkClient.sendEmail({
             "From": "support@chatgptassistants.com", // <-- IMPORTANT: Must be a verified Sender Signature in Postmark
             "To": user.email,
@@ -418,7 +419,7 @@ app.post('/auth/forgot-password', async (req, res) => {
             });
 
             // Send the reset email via Postmark
-            const resetUrl = `http://localhost:5173/reset-password?token=${resetToken}`;
+            const resetUrl = `${process.env.APP_URL}/reset-password?token=${resetToken}`;
             await postmarkClient.sendEmail({
                 "From": "support@chatgptassistants.com",
                 "To": user.email,
@@ -1698,11 +1699,11 @@ app.get('/auth/google/callback', isVerified, async (req, res) => {
         await startWatchingInbox(assistantId);
         
         // Redirect back to the specific assistant's page
-        res.redirect(`http://localhost:5173/assistant/${assistantId}`);
+        res.redirect(`${process.env.APP_URL}/assistant/${assistantId}`);
 
     } catch (error) {
         console.error("Error in Google callback:", error);
-        res.redirect('http://localhost:5173/assistants');
+        res.redirect(`${process.env.APP_URL}/assistants`);
     }
 });
 
