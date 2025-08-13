@@ -198,37 +198,39 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
     res.json({received: true});
 });
 app.use(express.json());
+
 const allowedOrigins = [
   'http://localhost:5173',
   'https://chatgpt-assistant-rho.vercel.app',
-  // add any other vercel domains you actually use:
-  // 'https://chatgpt-assistant-<your-other>.vercel.app',
 ];
 
-// trust proxy for secure cookies on Render
 app.set('trust proxy', 1);
 
-// CORS must be before session & routes
-app.use(
-  cors({
-    origin(origin, cb) {
-      // allow same-origin / server-to-server / curl with no origin
-      if (!origin) return cb(null, true);
-      if (allowedOrigins.includes(origin)) return cb(null, true);
-      return cb(new Error(`CORS: ${origin} not allowed`));
-    },
-    credentials: true, // needed for cookies
-  })
-);
+app.use(cors({
+  origin(origin, cb) {
+    if (!origin) return cb(null, true);                 // same-origin / curl
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error(`CORS: ${origin} not allowed`));
+  },
+  credentials: true,
+}));
 
-// Make sure preflight succeeds (no redirects!)
-app.options(
-  '*',
-  cors({
-    origin: allowedOrigins,
-    credentials: true,
-  })
-);
+// ✅ Express-5 safe preflight handler (no path pattern)
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    // mirror CORS headers so browsers are happy
+    const origin = req.headers.origin;
+    if (!origin || allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin || '*');
+      res.header('Access-Control-Allow-Credentials', 'true');
+      res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+      res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+    }
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 app.use(cookieParser());
 
 app.use(session({
