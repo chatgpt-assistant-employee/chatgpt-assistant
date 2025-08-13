@@ -42,7 +42,7 @@ function SettingsPage() {
         setMessage({ type: '', text: '' });
         setIsSaving(true);
         try {
-            const response = await fetch('http://localhost:3001/api/user/profile', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/user/profile`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -69,7 +69,7 @@ function SettingsPage() {
             return;
         }
         try {
-            const response = await fetch('http://localhost:3001/api/user/password', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/user/password`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -95,7 +95,7 @@ function SettingsPage() {
         const formData = new FormData();
         formData.append('avatar', file);
         try {
-            const response = await fetch('http://localhost:3001/api/user/avatar', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/user/avatar`, {
                 method: 'POST',
                 credentials: 'include',
                 body: formData,

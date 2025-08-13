@@ -12,7 +12,7 @@ export const UserProvider = ({ children }) => {
     const checkLoginStatus = useCallback(async () => {
         setIsLoading(true);
         try {
-            const response = await fetch('http://localhost:3001/api/me', { credentials: 'include' });
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/me`, { credentials: 'include' });
             if (response.ok) {
                 setUser(await response.json());
             } else {
@@ -33,7 +33,7 @@ export const UserProvider = ({ children }) => {
     
     // Function to log the user out
     const logout = async () => {
-        await fetch('http://localhost:3001/auth/logout', { credentials: 'include' });
+        await fetch(`${import.meta.env.VITE_API_URL}/auth/logout`, { credentials: 'include' });
         setUser(null);
     };
 

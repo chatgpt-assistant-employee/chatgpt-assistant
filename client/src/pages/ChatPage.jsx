@@ -47,7 +47,7 @@ function ChatPage() {
     useEffect(() => {
         const fetchAssistants = async () => {
             try {
-                const response = await fetch('http://localhost:3001/api/assistants', { credentials: 'include' });
+                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/assistants`, { credentials: 'include' });
                 if (response.ok) {
                     const data = await response.json();
                     const fallbackAvatars = [
@@ -135,7 +135,7 @@ function ChatPage() {
         setIsLoading(true);
 
         try {
-            const response = await fetch('http://localhost:3001/api/chat', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',

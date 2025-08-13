@@ -117,7 +117,7 @@ function ConversationRow(props) {
         setExtractedData(null);
         const conversationText = details.map(m => `From: ${m.from}\n\n${m.body}`).join('\n\n---\n\n');
         try {
-            const replyRes = await fetch('http://localhost:3001/api/generate-reply', {
+            const replyRes = await fetch(`${import.meta.env.VITE_API_URL}/api/generate-reply`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -137,7 +137,7 @@ function ConversationRow(props) {
 
         try {
             // Step 1: Extract Data
-            const extractRes = await fetch('http://localhost:3001/api/extract-data', {
+            const extractRes = await fetch(`${import.meta.env.VITE_API_URL}/api/extract-data`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -151,7 +151,7 @@ function ConversationRow(props) {
             const conversationText = details.map(m => `From: ${m.from}\n\n${m.body}`).join('\n\n---\n\n');
             const replyPrompt = `A potential customer named '${extracted.name || 'this person'}' (email: ${extracted.email || 'unknown'}) sent an inquiry. Based on the full conversation thread below, draft a professional reply. \n\nCONVERSATION:\n"""${conversationText}"""`;
 
-            const replyRes = await fetch('http://localhost:3001/api/generate-reply', {
+            const replyRes = await fetch(`${import.meta.env.VITE_API_URL}api/generate-reply`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -168,7 +168,7 @@ function ConversationRow(props) {
         setSendStatus('');
         try {
             const finalRecipient = extractedData?.email || row.from; // Use extracted email if available
-            const response = await fetch('http://localhost:3001/api/send-email', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/send-email`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',

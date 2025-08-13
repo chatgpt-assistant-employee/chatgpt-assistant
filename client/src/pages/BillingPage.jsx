@@ -343,7 +343,7 @@ function BillingPage() {
   const fetchBillingDetails = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:3001/api/billing-details', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/billing-details`, {
         method: 'GET',
         credentials: 'include',
       });
@@ -431,7 +431,7 @@ function BillingPage() {
 
             if (isExistingSubscriber) {
             // Change existing plan
-            const resp = await fetch('http://localhost:3001/api/change-plan', {
+            const resp = await fetch(`${import.meta.env.VITE_API_URL}/api/change-plan`, {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
@@ -453,7 +453,7 @@ function BillingPage() {
             // Refresh local state
             await refetchUser();
             // Re-fetch billing details manually so it updates immediately
-            const billingResp = await fetch('http://localhost:3001/api/billing-details', {
+            const billingResp = await fetch(`${import.meta.env.VITE_API_URL}/api/billing-details`, {
                 method: 'GET',
                 credentials: 'include',
             });
@@ -465,7 +465,7 @@ function BillingPage() {
             } else {
             // New subscription flow
             setSelectedPlan(planId);
-            const response = await fetch('http://localhost:3001/api/create-checkout-session', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/create-checkout-session`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -495,7 +495,7 @@ function BillingPage() {
         setIsLoading(true);
         setError('');
         try {
-            const response = await fetch('http://localhost:3001/api/create-checkout-session', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/create-checkout-session`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -523,7 +523,7 @@ function BillingPage() {
     const handleManageBillingClick = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch('http://localhost:3001/api/create-portal-session', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/create-portal-session`, {
                 method: 'POST',
                 credentials: 'include',
             });
@@ -561,7 +561,7 @@ function BillingPage() {
             // If user is removing slots, do it directly
             setIsLoading(true);
             try {
-                await fetch('http://localhost:3001/api/manage-slots', {
+                await fetch(`${import.meta.env.VITE_API_URL}/api/manage-slots`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
@@ -575,7 +575,7 @@ function BillingPage() {
 
     const cancelPendingDowngrade = async () => {
         try {
-            const res = await fetch('http://localhost:3001/api/cancel-pending-downgrade', {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/cancel-pending-downgrade`, {
             method: 'POST',
             credentials: 'include',
             });
@@ -598,7 +598,7 @@ function BillingPage() {
     const handlePurchaseConfirm = async () => {
         setIsPurchasing(true);
         try {
-            await fetch('http://localhost:3001/api/manage-slots', {
+            await fetch(`${import.meta.env.VITE_API_URL}/api/manage-slots`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -1035,14 +1035,14 @@ function BillingPage() {
                             })}</strong>.{' '}
                             <Button size="small" onClick={async () => {
                             // cancel pending plan downgrade
-                            const res = await fetch('http://localhost:3001/api/cancel-pending-plan-downgrade', {
+                            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/cancel-pending-plan-downgrade`, {
                                 method: 'POST',
                                 credentials: 'include',
                             });
                             if (res.ok) {
                                 setScheduledPlanDowngrade(null);
                                 await refetchUser();
-                                const updated = await fetch('http://localhost:3001/api/billing-details', { credentials: 'include' });
+                                const updated = await fetch(`${import.meta.env.VITE_API_URL}/api/billing-details`, { credentials: 'include' });
                                 if (updated.ok) setBillingDetails(await updated.json());
                             } else {
                                 const err = await res.json();
@@ -1057,9 +1057,9 @@ function BillingPage() {
                             Downgrade to <strong>{billingDetails.pendingPlan?.toUpperCase()}</strong> scheduled; it will take effect on{' '}
                             <strong>{billingDetails.renewalDate ? new Date(billingDetails.renewalDate).toLocaleDateString('en-US') : 'the next billing date'}</strong>.{' '}
                             <Button size="small" onClick={async () => {
-                            await fetch('http://localhost:3001/api/cancel-pending-plan-downgrade', { method: 'POST', credentials: 'include' });
+                            await fetch(`${import.meta.env.VITE_API_URL}/api/cancel-pending-plan-downgrade`, { method: 'POST', credentials: 'include' });
                             await refetchUser();
-                            const updated = await fetch('http://localhost:3001/api/billing-details', { credentials: 'include' });
+                            const updated = await fetch(`${import.meta.env.VITE_API_URL}/api/billing-details`, { credentials: 'include' });
                             if (updated.ok) setBillingDetails(await updated.json());
                             }} variant="outlined" sx={{ ml: 1 }}>
                             Cancel Downgrade

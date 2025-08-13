@@ -40,7 +40,7 @@ function CreateAssistantPage({ onAssistantCreated }) {
     });
 
     try {
-      const response = await fetch('http://localhost:3001/api/assistant', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/assistant`, {
         method: 'POST',
         credentials: 'include',
         body: formData,

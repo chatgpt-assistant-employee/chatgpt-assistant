@@ -153,7 +153,7 @@ function DashboardPage() {
     useEffect(() => {
         const fetchAssistants = async () => {
             try {
-                const response = await fetch('http://localhost:3001/api/assistants', { credentials: 'include' });
+                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/assistants`, { credentials: 'include' });
                 if (response.ok) {
                     const data = await response.json();
                     const fallbackAvatars = [
