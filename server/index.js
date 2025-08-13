@@ -528,8 +528,8 @@ app.post('/api/create-checkout-session', isVerified, async (req, res) => {
             payment_method_types: ['card'],
             line_items: [{ price: priceId, quantity: 1 }],
             mode: 'subscription',
-            success_url: `http://localhost:5173/payment-success`,
-            cancel_url: `http://localhost:5173/billing?cancelled=true`,
+            success_url: `${FRONTEND_URL}/payment-success`,
+            cancel_url: `${FRONTEND_URL}/billing?cancelled=true`,
         });
 
         res.json({ url: session.url });
@@ -743,7 +743,7 @@ app.post('/api/create-portal-session', isVerified, async (req, res) => {
 
         const portalSession = await stripe.billingPortal.sessions.create({
             customer: user.stripeCustomerId,
-            return_url: 'http://localhost:5173/billing',
+            return_url: `${FRONTEND_URL}/billing`,
         });
         
         console.log('DIAGNOSTIC: Successfully created portal session. URL:', portalSession.url);
