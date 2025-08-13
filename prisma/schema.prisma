@@ -1,0 +1,101 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String      @id @default(cuid())
+  email                 String      @unique
+  passwordHash          String
+  name                  String?
+  imageUrl              String?
+  createdAt             DateTime    @default(now())
+
+  // --- NEW VERIFICATION FIELDS ---
+  isVerified            Boolean     @default(false)
+  verificationToken     String?     @unique
+
+  // --- NEW PASSWORD RESET FIELDS ---
+  passwordResetToken    String?     @unique
+  passwordResetExpiry   DateTime?
+
+  // --- NEW & FINAL SUBSCRIPTION FIELDS ---
+  stripeCustomerId      String?     @unique
+  stripeSubscriptionId  String?     @unique
+  plan                  String?
+  pendingPlan           String? // e.g. "gold", "basic", "platinum"
+  subscriptionStatus    String      @default("inactive")
+  subscriptionEndsAt    DateTime?
+
+  pendingAddOnSlots     Int?
+  basePlanLimit         Int         @default(0) // How many assistants the main plan includes (e.g., 1)
+  addOnSlots            Int         @default(0) // How many extra assistants they pay for
+
+  assistants            Assistant[]
+}
+
+model Assistant {
+  id                String    @id @default(cuid())
+  name              String
+  instructions      String
+  avatarUrl         String?
+  createdAt         DateTime  @default(now())
+  
+  // Link back to the User who owns this assistant
+  userId            String
+  role              String?
+  user              User      @relation(fields: [userId], references: [id])
+
+  // Each assistant has its own OpenAI ID and Google connection
+  openaiAssistantId String    @unique
+  googleTokens      Json?
+  emailAddress      String?
+
+  googleHistoryId     String? // Tracks the last known state of the inbox
+  googleChannelId     String? // The ID of the push notification channel
+  googleChannelExpiry DateTime? // When the channel expires and needs to be renewed
+
+  chatThreads       ChatThread[]
+  emailLogs   EmailLog[]
+}
+
+model ChatThread {
+  id              String    @id @default(cuid())
+  openaiThreadId  String    @unique // The ID from OpenAI
+  title           String    // A title for the chat, e.g., "Inquiry about invoices"
+  createdAt       DateTime  @default(now())
+
+  assistantId     String
+  assistant       Assistant @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+}
+
+model EmailLog {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  action          String   // e.g., "REPLY_GENERATED", "REPLY_SENT"
+
+  followUpRequired  Boolean  @default(true) // Is a follow-up scheduled for this sent message?
+  followUpSent      Boolean  @default(false) // Has the one-time follow-up already been sent?
+
+  threadId        String?
+  status          String   @default("sent") // "sent", "opened", "clicked"
+  clickToken      String?
+  gmailMessageId  String?  // The ID of the message after it's sent
+  postmarkMessageId   String?
+  recipientEmail  String?  // Who the email was sent to
+
+  // Open tracking metadata
+  openedAt            DateTime? // When the email was first opened
+  clickedAt           DateTime? // When any link was clicked
+  userAgent           String?   // Browser/client that opened the email
+  ipAddress           String?   // IP address (for analytics)
+
+  assistantId     String
+  assistant       Assistant @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+}
