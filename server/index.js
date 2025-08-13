@@ -206,10 +206,15 @@ app.use(cors({
 }));
 app.use(cookieParser());
 app.use(session({
-    secret: 'a_very_secret_key_for_sessions_replace_this_for_production',
+    secret: process.env.SESSION_SECRET || 'a_very_secret_key_for_sessions_replace_this_for_production',
     resave: false,
-    saveUninitialized: true, // Set to true to help stabilize session in dev
-    cookie: { secure: false, sameSite: 'lax' },
+    saveUninitialized: false, // Set to false for production
+    cookie: { 
+        secure: true, // Must be true since sameSite is 'none'
+        sameSite: 'none', // This is the key setting for cross-domain cookies
+        httpOnly: true,
+        maxAge: 1000 * 60 * 60 * 24 * 7 // e.g., 7 days
+    },
 }));
 
 // --- HELPER FUNCTIONS ---
@@ -354,7 +359,7 @@ app.post('/auth/register', async (req, res) => {
             data: { email, passwordHash, verificationToken },
         });
 
-        const verificationUrl = `http://localhost:5173/verify-email?token=${verificationToken}`;
+        const verificationUrl = `https://chatgpt-assistant-rho.vercel.app/verify-email?token=${verificationToken}`;
         await postmarkClient.sendEmail({
             "From": "support@chatgptassistants.com", // <-- IMPORTANT: Must be a verified Sender Signature in Postmark
             "To": user.email,
