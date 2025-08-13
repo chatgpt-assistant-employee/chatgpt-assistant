@@ -198,15 +198,39 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
     res.json({received: true});
 });
 app.use(express.json());
-app.use(cors({
-    origin: [
-        'http://localhost:5173',
-        'https://chatgpt-assistant-rho.vercel.app' // Your live frontend URL
-    ],
-    credentials: true,
-}));
-app.use(cookieParser());
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://chatgpt-assistant-rho.vercel.app',
+  // add any other vercel domains you actually use:
+  // 'https://chatgpt-assistant-<your-other>.vercel.app',
+];
+
+// trust proxy for secure cookies on Render
 app.set('trust proxy', 1);
+
+// CORS must be before session & routes
+app.use(
+  cors({
+    origin(origin, cb) {
+      // allow same-origin / server-to-server / curl with no origin
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error(`CORS: ${origin} not allowed`));
+    },
+    credentials: true, // needed for cookies
+  })
+);
+
+// Make sure preflight succeeds (no redirects!)
+app.options(
+  '*',
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+  })
+);
+app.use(cookieParser());
+
 app.use(session({
     secret: process.env.SESSION_SECRET || 'a_very_secret_key_for_sessions_replace_this_for_production',
     resave: false,
