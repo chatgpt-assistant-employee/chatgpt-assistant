@@ -25,6 +25,7 @@ function VerifyEmailPage() {
                 const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/verify-email`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({ token }),
                 });
                 const data = await response.json();

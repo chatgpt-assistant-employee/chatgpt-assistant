@@ -67,7 +67,7 @@ function AssistantsPage() {
       // This is now a simple delete. It frees up a slot.
       if (window.confirm('Are you sure you want to delete this assistant? This will free up a slot in your plan.')) {
           try {
-              await fetch(`http://localhost:3001/api/assistant/${assistantId}`, {
+              await fetch(`${import.meta.env.VITE_API_URL}/api/assistant/${assistantId}`, {
                   method: 'DELETE',
                   credentials: 'include'
               });

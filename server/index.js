@@ -20,6 +20,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const fs   = require('fs');
 const path = require('path');
 const cron = require('node-cron');
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -205,6 +206,7 @@ app.use(cors({
     credentials: true,
 }));
 app.use(cookieParser());
+app.set('trust proxy', 1);
 app.use(session({
     secret: process.env.SESSION_SECRET || 'a_very_secret_key_for_sessions_replace_this_for_production',
     resave: false,
@@ -360,7 +362,7 @@ app.post('/auth/register', async (req, res) => {
         });
 
 
-        const verificationUrl = `${process.env.APP_URL}/verify-email?token=${verificationToken}`;
+        const verificationUrl = `${FRONTEND_URL}/verify-email?token=${verificationToken}`;
         await postmarkClient.sendEmail({
             "From": "support@chatgptassistants.com", // <-- IMPORTANT: Must be a verified Sender Signature in Postmark
             "To": user.email,
@@ -419,7 +421,7 @@ app.post('/auth/forgot-password', async (req, res) => {
             });
 
             // Send the reset email via Postmark
-            const resetUrl = `${process.env.APP_URL}/reset-password?token=${resetToken}`;
+            const resetUrl = `${FRONTEND_URL}/reset-password?token=${resetToken}`;
             await postmarkClient.sendEmail({
                 "From": "support@chatgptassistants.com",
                 "To": user.email,
@@ -1699,11 +1701,11 @@ app.get('/auth/google/callback', isVerified, async (req, res) => {
         await startWatchingInbox(assistantId);
         
         // Redirect back to the specific assistant's page
-        res.redirect(`${process.env.APP_URL}/assistant/${assistantId}`);
+        res.redirect(`${FRONTEND_URL}/assistant/${assistantId}`);
 
     } catch (error) {
         console.error("Error in Google callback:", error);
-        res.redirect(`${process.env.APP_URL}/assistants`);
+        res.redirect(`${FRONTEND_URL}/assistants`);
     }
 });
 

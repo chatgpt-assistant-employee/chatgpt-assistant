@@ -547,7 +547,7 @@ function BillingPage() {
         if (editableSlots > currentSlots) {
             setIsLoading(true);
             try {
-                const response = await fetch(`http://localhost:3001/api/proration-preview/${editableSlots}`, {
+                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/proration-preview/${editableSlots}`, {
                 credentials: 'include'
                 });
 

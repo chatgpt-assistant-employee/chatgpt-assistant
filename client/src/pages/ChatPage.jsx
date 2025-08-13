@@ -71,7 +71,7 @@ function ChatPage() {
         if (!selectedAssistant) return;
         const fetchThreads = async () => {
             try {
-                const response = await fetch(`http://localhost:3001/api/chat/threads/${selectedAssistant}`, { credentials: 'include' });
+                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/threads/${selectedAssistant}`, { credentials: 'include' });
                 if (response.ok) setChatThreads(await response.json());
             } catch (error) { console.error("Failed to fetch threads:", error); }
         };
@@ -92,7 +92,7 @@ function ChatPage() {
         if (!editingTitle.trim()) return;
         try {
             const res = await fetch(
-            `http://localhost:3001/api/chat/thread/${threadId}`,
+            `${import.meta.env.VITE_API_URL}/api/chat/thread/${threadId}`,
             {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -117,7 +117,7 @@ function ChatPage() {
 
     const handleSelectThread = async (thread) => {
         try {
-            const response = await fetch(`http://localhost:3001/api/chat/thread/${thread.openaiThreadId}`, { credentials: 'include' });
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/thread/${thread.openaiThreadId}`, { credentials: 'include' });
             if (response.ok) {
                 const messages = await response.json();
                 setCurrentThread({ id: thread.openaiThreadId, messages: messages });
@@ -145,7 +145,7 @@ function ChatPage() {
             if (response.ok) {
                 setCurrentThread(prev => ({ id: data.threadId, messages: [...prev.messages, { role: 'assistant', content: data.reply }] }));
                 if (!currentThread.id) { // If it was a new chat, refresh history
-                    const res = await fetch(`http://localhost:3001/api/chat/threads/${selectedAssistant}`, { credentials: 'include' });
+                    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/threads/${selectedAssistant}`, { credentials: 'include' });
                     if (res.ok) setChatThreads(await res.json());
                 }
             }

@@ -183,10 +183,10 @@ if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
             setIsLoading(true);
             try {
                 const [statsRes, dailyChartRes, hourlyChartRes, trackingRes] = await Promise.all([
-                    fetch(`http://localhost:3001/api/stats/${selectedAssistant}`, { credentials: 'include' }),
-                    fetch(`http://localhost:3001/api/stats/chart/${selectedAssistant}`, { credentials: 'include' }),
-                    fetch(`http://localhost:3001/api/stats/hourly/${selectedAssistant}`, { credentials: 'include' }),
-                    fetch(`http://localhost:3001/api/stats/tracking/${selectedAssistant}`, { credentials: 'include' })
+                    fetch(`${import.meta.env.VITE_API_URL}/api/stats/${selectedAssistant}`, { credentials: 'include' }),
+                    fetch(`${import.meta.env.VITE_API_URL}/api/stats/chart/${selectedAssistant}`, { credentials: 'include' }),
+                    fetch(`${import.meta.env.VITE_API_URL}/api/stats/hourly/${selectedAssistant}`, { credentials: 'include' }),
+                    fetch(`${import.meta.env.VITE_API_URL}/api/stats/tracking/${selectedAssistant}`, { credentials: 'include' })
                 ]);
                 if (statsRes.ok) setStats(await statsRes.json());
                 if (dailyChartRes.ok) setDailyChartData(await dailyChartRes.json());

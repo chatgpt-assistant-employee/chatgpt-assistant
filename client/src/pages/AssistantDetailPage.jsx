@@ -70,7 +70,7 @@ function ConversationRow(props) {
         setIsLoading(true);
         try {
             const response = await fetch(
-              `http://localhost:3001/api/thread/${assistantId}/${row.id}`,
+              `${import.meta.env.VITE_API_URL}/api/thread/${assistantId}/${row.id}`,
               { credentials: 'include' }
             );
             if (response.ok) {
@@ -89,7 +89,7 @@ function ConversationRow(props) {
     const fetchThreadMessages = async () => {
         try {
             const response = await fetch(
-              `http://localhost:3001/api/thread/${assistantId}/${row.id}`,
+              `${import.meta.env.VITE_API_URL}/api/thread/${assistantId}/${row.id}`,
               { credentials: 'include' }
             );
             if (response.ok) {
@@ -288,7 +288,7 @@ function AssistantDetailPage() {
     const fetchAssistantData = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch(`http://localhost:3001/api/assistant/${id}`, { credentials: 'include' });
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/assistant/${id}`, { credentials: 'include' });
             if (!response.ok) throw new Error('Assistant not found');
             const result = await response.json();
             setAssistantData(result);
@@ -309,7 +309,7 @@ function AssistantDetailPage() {
         if (!assistantData?.assistant.googleTokens) return;
         try {
             const res = await fetch(
-              `http://localhost:3001/api/threads/${id}`,
+              `${import.meta.env.VITE_API_URL}/api/threads/${id}`,
               { credentials: 'include' }
             );
             if (res.ok) setThreads(await res.json());
@@ -345,7 +345,7 @@ function AssistantDetailPage() {
         setIsLoading(true);
         setError('');
         try {
-            const response = await fetch(`http://localhost:3001/api/assistant/${id}`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/assistant/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -383,7 +383,7 @@ function AssistantDetailPage() {
         const formData = new FormData();
         formData.append('file', file);
         try {
-            await fetch(`http://localhost:3001/api/assistant/${id}/files`, {
+            await fetch(`${import.meta.env.VITE_API_URL}/api/assistant/${id}/files`, {
                 method: 'POST',
                 credentials: 'include',
                 body: formData
@@ -397,7 +397,7 @@ function AssistantDetailPage() {
     const handleFileRemove = async (fileId) => {
         if (window.confirm('Are you sure you want to remove this file from the assistant’s knowledge?')) {
             try {
-                await fetch(`http://localhost:3001/api/assistant/${id}/files/${fileId}`, {
+                await fetch(`${import.meta.env.VITE_API_URL}/api/assistant/${id}/files/${fileId}`, {
                     method: 'DELETE',
                     credentials: 'include'
                 });
@@ -411,7 +411,7 @@ function AssistantDetailPage() {
     const handleDelete = async () => {
         setDeleting(true);
         try {
-            await fetch(`http://localhost:3001/api/assistant/${assistant.id}`, {
+            await fetch(`${import.meta.env.VITE_API_URL}/api/assistant/${assistant.id}`, {
             method: 'DELETE',
             credentials: 'include'
             });
@@ -427,7 +427,7 @@ function AssistantDetailPage() {
     const handleGoogleDisconnect = async () => {
         if (window.confirm('Are you sure you want to disconnect this Gmail account?')) {
             try {
-                await fetch(`http://localhost:3001/auth/google/disconnect/${id}`, {
+                await fetch(`${import.meta.env.VITE_API_URL}/auth/google/disconnect/${id}`, {
                     method: 'POST',
                     credentials: 'include'
                 });
@@ -559,7 +559,7 @@ function AssistantDetailPage() {
                                 <Button variant="outlined" color="#beacdbff" size="small" onClick={handleGoogleDisconnect}>Disconnect</Button>
                             </>
                         ) : (
-                            <Button variant="contained" startIcon={<LinkIcon />} href={`http://localhost:3001/auth/google?assistantId=${assistant.id}`}>Connect Gmail</Button>
+                            <Button variant="contained" startIcon={<LinkIcon />} href={`${import.meta.env.VITE_API_URL}/auth/google?assistantId=${assistant.id}`}>Connect Gmail</Button>
                         )}
                     </Box>
 
