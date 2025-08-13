@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { Box, Button, Paper, TextField, Typography, Link, CircularProgress } from '@mui/material';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 function AuthPage({ onLoginSuccess }) {
   const [isLoginView, setIsLoginView] = useState(true);
   const [email, setEmail] = useState('');
@@ -19,7 +21,7 @@ function AuthPage({ onLoginSuccess }) {
     const endpoint = isLoginView ? '/auth/login' : '/auth/register';
     
     try {
-      const response = await fetch(`http://localhost:3001${endpoint}`, {
+      const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
