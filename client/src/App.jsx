@@ -24,6 +24,22 @@ import VerifyEmailPage from './pages/VerifyEmailPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 
+// This is a new, simple component to show to unverified users
+function UnverifiedPage({ userEmail }) {
+    return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', bgcolor: 'grey.100' }}>
+            <Paper sx={{ p: 4, textAlign: 'center', maxWidth: '500px' }}>
+                <Typography variant="h5" gutterBottom>Check Your Email</Typography>
+                <Typography color="text.secondary">
+                    We've sent a verification link to <strong>{userEmail}</strong>.
+                    <br/>
+                    Please click the link in that email to continue.
+                </Typography>
+            </Paper>
+        </Box>
+    );
+}
+
 // This new component consumes the context to decide what to render
 function AppContent() {
     const { user, isLoading, refetchUser } = useUser();
@@ -47,6 +63,9 @@ function AppContent() {
                     // If no user, show the AuthPage for all routes
                     <Route path="*" element={<AuthPage onLoginSuccess={refetchUser} />} />
                   </>
+                  ) : !user.isVerified ? (
+                    // --- NEW: If user is logged in but NOT verified, show this dedicated page ---
+                    <Route path="*" element={<UnverifiedPage userEmail={user.email} />} />
                 ) : (
                   <>
                     // If user exists, show the main application layout and pages
