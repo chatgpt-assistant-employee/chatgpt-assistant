@@ -200,7 +200,7 @@ app.use(express.json());
 app.use(cors({
     origin: [
         'http://localhost:5173', // Your local frontend for development
-        'chatgpt-assistant-rho.vercel.app' // <-- REPLACE with your actual Vercel URL
+        'http://chatgpt-assistant-rho.vercel.app' // <-- REPLACE with your actual Vercel URL
     ],
     credentials: true,
 }));
