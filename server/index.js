@@ -199,8 +199,8 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
 app.use(express.json());
 app.use(cors({
     origin: [
-        'http://localhost:5173', // Your local frontend for development
-        'http://chatgpt-assistant-rho.vercel.app' // <-- REPLACE with your actual Vercel URL
+        'http://localhost:5173',
+        'https://chatgpt-assistant-rho.vercel.app' // Your live frontend URL
     ],
     credentials: true,
 }));
