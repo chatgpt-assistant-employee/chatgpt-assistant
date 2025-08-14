@@ -343,6 +343,16 @@ function BillingPage() {
   const fetchBillingDetails = async () => {
     setIsLoading(true);
     try {
+      // If your user object carries a subscription flag, skip fetch for new users
+     const isSubscribed = ['active', 'cancelled_grace_period'].includes(user?.subscriptionStatus);
+     if (!isSubscribed) {
+       setBillingDetails(null);
+       setError('');
+       setIsLoading(false);
+       return;
+     }
+
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/billing-details`, {
         method: 'GET',
         credentials: 'include',
@@ -353,8 +363,9 @@ function BillingPage() {
       setBillingDetails(data);
       setEditableSlots(data.addOnSlots);
     } catch (err) {
-      console.error("Failed to fetch billing details:", err);
-      setError("Could not load your billing details.");
+      console.error("Billing details unexpected error:", err);
+     // Only show an error for real failures (network/5xx/4xx other than 404)
+     setError("Something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
     }
