@@ -208,12 +208,25 @@ const allowedOrigins = [
 app.set('trust proxy', 1);
 
 app.use(cors({
-  origin(origin, cb) {
-    if (!origin) return cb(null, true);                 // same-origin / curl
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    return cb(new Error(`CORS: ${origin} not allowed`));
-  },
-  credentials: true,
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        // Allow if the origin is in our main list
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            return callback(null, true);
+        }
+        
+        // Allow if the origin is a Vercel preview deployment for your project
+        // It checks if the URL ends with your Vercel team suffix.
+        if (origin.endsWith('-chattys-projects-a4c701be.vercel.app')) {
+            return callback(null, true);
+        }
+        
+        // If the origin is not allowed, reject the request
+        callback(new Error('CORS: This origin is not allowed.'));
+    },
+    credentials: true,
 }));
 
 // ✅ Express-5 safe preflight handler (no path pattern)
