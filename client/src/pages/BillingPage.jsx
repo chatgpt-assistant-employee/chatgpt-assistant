@@ -380,8 +380,8 @@ function BillingPage() {
             name: "BASIC", 
             price: 39, 
             features: [
-                "1 Assistant-Bot", 
-                "Chat with Assistant (Token System)", 
+                "1 Assistant Included", 
+                "Chat (100 msgs/month)", 
                 "Basic Analytics", 
                 "AI Support",
                 "Standard Response Time",
@@ -393,13 +393,13 @@ function BillingPage() {
             name: "GOLD", 
             price: 79, 
             features: [
-                "1 Assistant-Bot", 
+                "1 Assistant Included", 
                 "Chat (300 msgs/month)", 
                 "Extended Analytics", 
                 "Email Tracker",
                 "Priority Response Time",
                 "24/7 Support",
-                "Advanced Integrations"
+                "Advanced Integrations(coming soon)"
             ]
         },
         { 
@@ -407,14 +407,13 @@ function BillingPage() {
             name: "PLATINUM", 
             price: 139, 
             features: [
-                "1 Assistant-Bot", 
+                "1 Assistant Included", 
                 "Chat (1000 msgs/month)", 
                 "Extended Analytics", 
                 "Email Tracker",
                 "Fastest Response Time",
                 "VIP 24/7 Support",
-                "Premium Integrations",
-                "Custom Workflows",
+                "Premium Integrations (coming soon)",
                 "API Access"
             ]
         }

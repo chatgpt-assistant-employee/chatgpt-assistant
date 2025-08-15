@@ -197,6 +197,7 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
     }
     res.json({received: true});
 });
+
 app.use(express.json());
 
 const allowedOrigins = [
@@ -386,6 +387,33 @@ app.post('/auth/register', async (req, res) => {
         const user = await prisma.user.create({
             data: { email, passwordHash, verificationToken },
         });
+
+        // If a plan was selected, create a checkout session immediately
+        if (planIdentifier) {
+            const priceIdMap = {
+                basic: process.env.PRICE_ID_BASIC,
+                gold: process.env.PRICE_ID_GOLD,
+                platinum: process.env.PRICE_ID_PLATINUM,
+            };
+            const priceId = priceIdMap[planIdentifier];
+            if (!priceId) return res.status(400).json({ message: 'Invalid plan selected during registration.' });
+            
+            const customer = await stripe.customers.create({ email: user.email, name: user.name });
+            await prisma.user.update({ where: { id: user.id }, data: { stripeCustomerId: customer.id } });
+            
+            const session = await stripe.checkout.sessions.create({
+                customer: customer.id,
+                payment_method_types: ['card'],
+                line_items: [{ price: priceId, quantity: 1 }],
+                mode: 'subscription',
+                success_url: `${FRONTEND_URL}/payment-success`,
+                cancel_url: `${FRONTEND_URL}/billing?cancelled=true`,
+            });
+            
+            // Log the user in and send the checkout URL
+            req.session.userId = user.id;
+            return res.json({ checkoutUrl: session.url });
+        }
 
 
         const verificationUrl = `${FRONTEND_URL}/verify-email?token=${verificationToken}`;

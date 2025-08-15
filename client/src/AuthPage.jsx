@@ -13,6 +13,15 @@ function AuthPage({ onLoginSuccess }) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    // Check if a plan was passed in the URL
+    const plan = searchParams.get('plan');
+    if (plan) {
+      setSelectedPlan(plan);
+      setIsLoginView(false); // Default to register view if a plan is selected
+    }
+  }, [searchParams]);
+
   const handleAuth = async (event) => {
     event.preventDefault();
     setError('');
@@ -29,7 +38,13 @@ function AuthPage({ onLoginSuccess }) {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Something went wrong');
-      onLoginSuccess();
+
+      // If the backend sent a checkout URL, redirect to Stripe
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        onLoginSuccess();
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -44,6 +59,12 @@ function AuthPage({ onLoginSuccess }) {
         <Box sx={{ mb: 3 }}>
             <img src="/logo.png" alt="App Logo" style={{ height: '180px', filter: 'drop-shadow(0 0 8px rgba(124, 244, 248, .45))' }} />
         </Box>
+        {selectedPlan && !isLoginView && (
+                <Box sx={{mb: 2, p: 2, bgcolor: 'primary.lighter', borderRadius: 2}}>
+                    <Typography variant="h6">You've selected the {selectedPlan.toUpperCase()} plan!</Typography>
+                    <Typography variant="body2">Create your account to continue to payment.</Typography>
+                </Box>
+            )}
         <Typography variant="h4" component="h1" gutterBottom fontWeight="700">
           {isLoginView ? 'Welcome Back' : 'Create an Account'}
         </Typography>
