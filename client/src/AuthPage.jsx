@@ -1,7 +1,7 @@
 // client/src/AuthPage.jsx
 
 import { useState, useEffect } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { useSearchParams, Link as RouterLink } from 'react-router-dom';
 import { Box, Button, Paper, TextField, Typography, Link, CircularProgress } from '@mui/material';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -30,13 +30,14 @@ function AuthPage({ onLoginSuccess }) {
     setIsLoading(true);
 
     const endpoint = isLoginView ? '/auth/login' : '/auth/register';
+    const body = isLoginView ? { email, password } : { email, password, planIdentifier: selectedPlan };
     
     try {
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(body),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Something went wrong');
