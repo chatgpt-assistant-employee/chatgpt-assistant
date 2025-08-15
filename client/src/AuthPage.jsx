@@ -1,6 +1,6 @@
 // client/src/AuthPage.jsx
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { Box, Button, Paper, TextField, Typography, Link, CircularProgress } from '@mui/material';
 
