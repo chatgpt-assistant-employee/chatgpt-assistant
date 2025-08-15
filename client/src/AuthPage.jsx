@@ -12,6 +12,8 @@ function AuthPage({ onLoginSuccess }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const [selectedPlan, setSelectedPlan] = useState(null);
 
   useEffect(() => {
     // Check if a plan was passed in the URL
