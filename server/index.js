@@ -401,8 +401,25 @@ app.post('/auth/register', async (req, res) => {
             data: { email, passwordHash, verificationToken },
         });
 
-        // If a plan was selected, create a checkout session immediately
-        if (planIdentifier) {
+       // ✅ ALWAYS email the verification link (even if they picked a plan)
+        const verificationUrl = `${FRONTEND_URL}/verify-email?token=${verificationToken}`;
+        try {
+            await postmarkClient.sendEmail({
+            From: 'support@chatgptassistants.com',
+            To: user.email,
+            Subject: 'Verify Your Account for AI Gmail Assistant',
+            HtmlBody: `<p>Please verify your email:</p><a href="${verificationUrl}">Verify My Email</a>`,
+            TextBody: `Verify your email: ${verificationUrl}`,
+            MessageStream: 'outbound',
+            });
+            console.log('Postmark verification sent to', user.email);
+        } catch (e) {
+            console.error('Postmark send failed:', e);
+            // don't throw; still let the flow continue (user can use “Resend”)
+        }
+
+            // If a plan was selected, create a checkout session immediately
+            if (planIdentifier) {
             const priceIdMap = {
                 basic: process.env.PRICE_ID_BASIC,
                 gold: process.env.PRICE_ID_GOLD,
@@ -410,10 +427,10 @@ app.post('/auth/register', async (req, res) => {
             };
             const priceId = priceIdMap[planIdentifier];
             if (!priceId) return res.status(400).json({ message: 'Invalid plan selected during registration.' });
-            
+
             const customer = await stripe.customers.create({ email: user.email, name: user.name });
             await prisma.user.update({ where: { id: user.id }, data: { stripeCustomerId: customer.id } });
-            
+
             const session = await stripe.checkout.sessions.create({
                 customer: customer.id,
                 payment_method_types: ['card'],
@@ -422,29 +439,18 @@ app.post('/auth/register', async (req, res) => {
                 success_url: `${FRONTEND_URL}/payment-success`,
                 cancel_url: `${FRONTEND_URL}/billing?cancelled=true`,
             });
-            
-            // Log the user in and send the checkout URL
+
+            // log them in so they can hit /auth/resend-verification if needed
             req.session.userId = user.id;
             return res.json({ checkoutUrl: session.url });
+            }
+
+            // No plan chosen — normal path
+            return res.status(201).json({ message: 'Registration successful! Please check your email to verify your account.' });
+        } catch (error) {
+            console.error('Registration Error:', error);
+            res.status(500).json({ message: 'Error registering user.' });
         }
-
-
-        const verificationUrl = `${FRONTEND_URL}/verify-email?token=${verificationToken}`;
-        await postmarkClient.sendEmail({
-            "From": "support@chatgptassistants.com", // <-- IMPORTANT: Must be a verified Sender Signature in Postmark
-            "To": user.email,
-            "Subject": "Verify Your Account for AI Gmail Assistant",
-            "HtmlBody": `<strong>Welcome!</strong><br/><p>Please click the link below to verify your email address:</p><a href="${verificationUrl}">Verify My Email</a>`,
-            "TextBody": `Welcome! Please copy and paste this URL into your browser to verify your email address: ${verificationUrl}`,
-            "MessageStream": "outbound"
-        });
-
-        // Do not log the user in automatically. They must verify first.
-        res.status(201).json({ message: "Registration successful! Please check your email to verify your account." });
-    } catch (error) {
-        console.error("Registration Error:", error);
-        res.status(500).json({ message: "Error registering user." });
-    }
 });
 
 app.post('/auth/resend-verification', async (req, res) => {
