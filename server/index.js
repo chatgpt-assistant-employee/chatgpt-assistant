@@ -12,6 +12,7 @@ const OpenAI = require('openai');
 const multer = require('multer');
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
+const { toFile } = require('openai/uploads');
 const postmark = require('postmark'); // <-- Import Postmark
 const crypto = require('crypto');
 const cloudinary = require('cloudinary').v2;
@@ -1462,7 +1463,7 @@ app.post('/api/assistant', isVerified, upload.any(), async (req, res) => {
         if (files && files.length > 0) {
             for (const file of files) {
                 const openaiFile = await openai.files.create({
-                    file: { name: file.originalname, data: file.buffer },
+                    file: await toFile(file.buffer, file.originalname),
                     purpose: 'assistants',
                 });
                 fileIds.push(openaiFile.id);
@@ -1901,7 +1902,7 @@ app.post('/api/assistant/:assistantId/files', isVerified, upload.any(), async (r
         const files = Array.isArray(req.files) ? req.files : [];
         if (!files.length) return res.status(400).json({ message: 'No files uploaded.' });
 
-        const openaiFile = await openai.files.create({ file: { name: file.originalname, data: file.buffer }, purpose: 'assistants' });
+        const openaiFile = await openai.files.create({ file: await toFile(file.buffer, file.originalname), purpose: 'assistants' });
         await openai.beta.vectorStores.files.create(vectorStoreId, { file_id: openaiFile.id });
         res.status(201).json(openaiFile);
     } catch (error) { res.status(500).json({ message: 'Failed to add file.' }); }
