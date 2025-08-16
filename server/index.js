@@ -1449,12 +1449,15 @@ app.get('/api/assistants', isVerified, async (req, res) => {
 });
 
 // CREATE a new Assistant
-app.post('/api/assistant', isVerified, upload.array('files', 10), async (req, res) => {
+app.post('/api/assistant', isVerified, upload.any(), async (req, res) => {
     if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
 
     try {
         const { name, instructions, avatarUrl, role } = req.body;
-        const files = req.files;
+        const incoming = Array.isArray(req.files) ? req.files : [];
+        const files = incoming.filter(f =>
+            ['files','file','knowledge','knowledgeFiles','uploads'].includes(f.fieldname)
+        );
         const userId = req.session.userId;
         let fileIds = [];
 
@@ -1504,8 +1507,9 @@ app.post('/api/assistant', isVerified, upload.array('files', 10), async (req, re
         res.status(201).json(newDbAssistant);
 
     } catch (error) {
-        console.error('Error creating assistant:', error);
-        res.status(500).json({ message: 'Failed to create assistant.' });
+        console.error('Error creating assistant:',
+            error?.status, error?.message, error?.response?.data || error);
+        return res.status(500).json({ message: 'Failed to create assistant.' });
     }
 });
 
