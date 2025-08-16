@@ -37,11 +37,24 @@ function UnverifiedPage({ userEmail }) {
                 </Typography>
                 <Button
                   component={RouterLink}
-                  to="/login"
+                  to="/"
                   variant="outlined"
                   sx={{ mt: 2 }}
                 >
                   Back to Login
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={async () => {
+                    await fetch(`${import.meta.env.VITE_API_URL}/auth/resend-verification`, {
+                      method: 'POST',
+                      credentials: 'include',
+                    });
+                    // optionally show a toast: "Verification email sent"
+                  }}
+                  sx={{ mt: 2, ml: 1 }}
+                >
+                  Resend Email
                 </Button>
             </Paper>
         </Box>

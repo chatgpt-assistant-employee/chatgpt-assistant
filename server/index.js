@@ -447,6 +447,33 @@ app.post('/auth/register', async (req, res) => {
     }
 });
 
+app.post('/auth/resend-verification', async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
+  const user = await prisma.user.findUnique({ where: { id: req.session.userId } });
+  if (!user) return res.status(404).json({ message: 'User not found' });
+  if (user.isVerified) return res.status(400).json({ message: 'Already verified' });
+
+  const verificationToken = crypto.randomBytes(32).toString('hex');
+  await prisma.user.update({ where: { id: user.id }, data: { verificationToken } });
+
+  const verificationUrl = `${FRONTEND_URL}/verify-email?token=${verificationToken}`;
+
+  try {
+    await postmarkClient.sendEmail({
+      From: 'support@chatgptassistants.com',
+      To: user.email,
+      Subject: 'Verify your email',
+      HtmlBody: `Click <a href="${verificationUrl}">here</a> to verify your account.`,
+      TextBody: `Open this link to verify: ${verificationUrl}`,
+      MessageStream: 'outbound',
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Resend failed:', e);
+    res.status(500).json({ message: 'Failed to send verification email' });
+  }
+});
+
 // === NEW VERIFICATION ROUTE ===
 app.post('/auth/verify-email', async (req, res) => {
     try {
