@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link as RouterLink } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { CssBaseline, CircularProgress, Box, GlobalStyles, Paper, Typography } from '@mui/material';
+import { CssBaseline, CircularProgress, Box, GlobalStyles, Paper, Typography, Button } from '@mui/material';
 
 // Import Contexts and Themes
 import { ColorModeContext } from './contexts/ThemeContext';
