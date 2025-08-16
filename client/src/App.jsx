@@ -1,7 +1,7 @@
 // client/src/App.jsx
 
 import { useMemo, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link as RouterLink } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, CircularProgress, Box, GlobalStyles, Paper, Typography } from '@mui/material';
 
@@ -27,14 +27,22 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 // This is a new, simple component to show to unverified users
 function UnverifiedPage({ userEmail }) {
     return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', bgcolor: 'grey.100' }}>
-            <Paper sx={{ p: 4, textAlign: 'center', maxWidth: '500px' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', bgcolor: 'background.default' }}>
+            <Paper sx={{ p: 4, textAlign: 'center', maxWidth: '500px', bgcolor: 'background.paper' }}>
                 <Typography variant="h5" gutterBottom>Check Your Email</Typography>
                 <Typography color="text.secondary">
                     We've sent a verification link to <strong>{userEmail}</strong>.
                     <br/>
                     Please click the link in that email to continue.
                 </Typography>
+                <Button
+                  component={RouterLink}
+                  to="/login"
+                  variant="outlined"
+                  sx={{ mt: 2 }}
+                >
+                  Back to Login
+                </Button>
             </Paper>
         </Box>
     );
