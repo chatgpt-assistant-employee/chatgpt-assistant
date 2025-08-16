@@ -1454,10 +1454,7 @@ app.post('/api/assistant', isVerified, upload.any(), async (req, res) => {
 
     try {
         const { name, instructions, avatarUrl, role } = req.body;
-        const incoming = Array.isArray(req.files) ? req.files : [];
-        const files = incoming.filter(f =>
-            ['files','file','knowledge','knowledgeFiles','uploads'].includes(f.fieldname)
-        );
+        const files = Array.isArray(req.files) ? req.files : [];
         const userId = req.session.userId;
         let fileIds = [];
 
@@ -1889,7 +1886,7 @@ app.get('/api/emails/:assistantId', isVerified, async (req, res) => {
 });
 
 // --- FILE MANAGEMENT (PER-ASSISTANT) ---
-app.post('/api/assistant/:assistantId/files', isVerified, upload.single('file'), async (req, res) => {
+app.post('/api/assistant/:assistantId/files', isVerified, upload.any(), async (req, res) => {
     if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
     try {
         const { assistantId } = req.params;
@@ -1901,8 +1898,8 @@ app.post('/api/assistant/:assistantId/files', isVerified, upload.single('file'),
         const vectorStoreId = oaiAssistant.tool_resources?.file_search?.vector_store_ids?.[0];
         if (!vectorStoreId) return res.status(400).json({ message: 'Assistant does not have a knowledge base.' });
 
-        const file = req.file;
-        if (!file) return res.status(400).json({ message: 'No file uploaded.' });
+        const files = Array.isArray(req.files) ? req.files : [];
+        if (!files.length) return res.status(400).json({ message: 'No files uploaded.' });
 
         const openaiFile = await openai.files.create({ file: { name: file.originalname, data: file.buffer }, purpose: 'assistants' });
         await openai.beta.vectorStores.files.create(vectorStoreId, { file_id: openaiFile.id });
