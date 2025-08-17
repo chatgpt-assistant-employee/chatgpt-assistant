@@ -1488,7 +1488,7 @@ app.post('/api/assistant', isVerified, upload.any(), async (req, res) => {
             fileIds.push(oaiFile.id);
 
         } catch (uploadError) {
-            // This will catch the error and give us a more detailed report
+            // This will catch the error and give us a more detailed report 
             console.error('--- [DEBUG] ERROR during file upload process ---');
             console.error(uploadError);
             
