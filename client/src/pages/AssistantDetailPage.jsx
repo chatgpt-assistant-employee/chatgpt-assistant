@@ -359,12 +359,12 @@ function AssistantDetailPage() {
         setAssistantData(prev => ({
             ...prev,
             assistant: {
-                ...prev.assistant,
-                ...(json.assistant || json),               // if API returns {assistant:{...}}
+                ...(prev?.assistant || {}),
+                ...(json.assistant || json),
                 name: editName,
                 instructions: editInstructions,
-                avatarUrl: editAvatar
-            }
+                avatarUrl: editAvatar,
+            },
         }));
 
         setIsEditing(false);

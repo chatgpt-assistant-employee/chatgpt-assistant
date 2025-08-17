@@ -1583,36 +1583,37 @@ app.post('/api/assistant', isVerified, upload.any(), async (req, res) => {
 
 // GET a single assistant by its ID
 app.get('/api/assistant/:id', isVerified, async (req, res) => {
-    if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
-    try {
-        const { id } = req.params;
-        const assistant = await prisma.assistant.findUnique({ where: { id } });
-        if (!assistant || assistant.userId !== req.session.userId) {
-            return res.status(403).json({ message: 'Permission denied.' });
-        }
+  if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
+  try {
+    const { id } = req.params;
 
-        const oaiAssistant = await openai.beta.assistants.retrieve(assistant.openaiAssistantId);
-        const vectorStoreId = oaiAssistant.tool_resources?.file_search?.vector_store_ids?.[0];
+    // Owns it?
+    const dbAssistant = await prisma.assistant.findUnique({ where: { id } });
+    if (!dbAssistant || dbAssistant.userId !== req.session.userId) {
+      return res.status(403).json({ message: 'Permission denied.' });
+    }
 
-        let files = [];
-        if (vectorStoreId) {
-        // List files attached to the vector store, then hydrate with filename/bytes
-        const listed = await openai.beta.vectorStores.files.list(vectorStoreId, { limit: 100 });
-        files = await Promise.all(
-            (listed.data || []).map(async (f) => {
-            const meta = await openai.files.retrieve(f.id);
-            return {
-                id: meta.id,
-                filename: meta.filename,
-                bytes: meta.bytes,
-                created_at: meta.created_at
-            };
-            })
-        );
-        }
+    // Fetch OpenAI assistant -> vector store -> files (with filename/bytes)
+    const oaiAssistant = await openai.beta.assistants.retrieve(dbAssistant.openaiAssistantId);
+    const vectorStoreId = oaiAssistant.tool_resources?.file_search?.vector_store_ids?.[0];
 
-    res.json({ assistant, files });
-    } catch (error) { res.status(500).json({ message: 'Failed to fetch assistant.' }); }
+    let files = [];
+    if (vectorStoreId) {
+      const list = await openai.beta.vectorStores.files.list(vectorStoreId);
+      const detailed = await Promise.all(
+        (list.data || []).map(async (item) => {
+          const f = await openai.files.retrieve(item.id);
+          return { id: f.id, filename: f.filename, bytes: f.bytes };
+        })
+      );
+      files = detailed;
+    }
+
+    res.json({ assistant: dbAssistant, files });
+  } catch (error) {
+    console.error('Failed to fetch assistant:', error);
+    res.status(500).json({ message: 'Failed to fetch assistant.' });
+  }
 });
 
 // DELETE a specific assistant
