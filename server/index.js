@@ -1467,33 +1467,30 @@ app.post('/api/assistant', isVerified, upload.any(), async (req, res) => {
 
             // Step 1: Prepare the file object using toFile
             const fileForUpload = await toFile(file.buffer, file.originalname);
-            console.log('--- [DEBUG] Step 1/3 SUCCESS: File prepared by toFile.');
+            console.log('--- [DEBUG] File prepared by toFile.');
 
-            // Step 2: Get a reference to the files API
-            const filesApi = openai.files;
-            if (!filesApi || typeof filesApi.create !== 'function') {
-                // This check will fail if the .create method is missing for any reason
-                throw new Error('CRITICAL: openai.files object is invalid or missing the .create method!');
-            }
-            console.log('--- [DEBUG] Step 2/3 SUCCESS: openai.files object and .create method are valid.');
-
-            // Step 3: Execute the API call
-            console.log('--- [DEBUG] Attempting Step 3: Calling filesApi.create...');
-            const oaiFile = await filesApi.create({
+            // Step 2: Execute the API call directly
+            console.log('--- [DEBUG] Calling openai.files.create...');
+            const oaiFile = await openai.files.create({
                 file: fileForUpload,
                 purpose: 'assistants',
             });
-            console.log('--- [DEBUG] Step 3/3 SUCCESS: OpenAI file created with ID:', oaiFile.id);
+            console.log('--- [DEBUG] OpenAI file created with ID:', oaiFile.id);
 
             fileIds.push(oaiFile.id);
 
         } catch (uploadError) {
-            // This will catch the error and give us a more detailed report
             console.error('--- [DEBUG] ERROR during file upload process ---');
-            console.error(uploadError);
+            console.error('Error details:', uploadError);
+            console.error('Error message:', uploadError.message);
+            console.error('Error response:', uploadError.response?.data);
             
             // Send a proper error response to the frontend
-            return res.status(500).json({ message: 'An internal error occurred during file upload.', error: uploadError.message });
+            return res.status(500).json({ 
+                message: 'An internal error occurred during file upload.', 
+                error: uploadError.message,
+                details: uploadError.response?.data
+            });
         }
     }
 }
