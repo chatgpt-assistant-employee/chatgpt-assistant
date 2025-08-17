@@ -8,7 +8,8 @@ const session = require('express-session');
 const cookieParser = require('cookie-parser');
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
-const OpenAI = require('openai');
+const OpenAIModule = require('openai');
+const OpenAI = OpenAIModule?.default ?? OpenAIModule;
 const multer = require('multer');
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
@@ -42,6 +43,8 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const postmarkClient = new postmark.ServerClient(process.env.POSTMARK_API_TOKEN);
+
+console.log('OpenAI SDK version (runtime):', require('openai/package.json').version);
 
 // Simple per‑assistant cache: { [assistantId]: { timestamp, threads } }
 const threadsCache = new Map();
@@ -1458,6 +1461,13 @@ app.post('/api/assistant', isVerified, upload.any(), async (req, res) => {
         const files = Array.isArray(req.files) ? req.files : [];
         const userId = req.session.userId;
         let fileIds = [];
+
+        console.log({
+  filesCreate: !!openai.files?.create,
+  vsCreate: !!(openai.beta?.vectorStores?.create || openai.vectorStores?.create),
+  vsFilesCreate: !!(openai.beta?.vectorStores?.files?.create || openai.vectorStores?.files?.create),
+  asstCreate: !!(openai.beta?.assistants?.create || openai.assistants?.create),
+});
 
         // 1. Upload files to OpenAI if they exist
         if (files.length) {
