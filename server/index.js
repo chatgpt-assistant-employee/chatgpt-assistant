@@ -1461,15 +1461,42 @@ app.post('/api/assistant', isVerified, upload.any(), async (req, res) => {
 
         // 1. Upload files to OpenAI if they exist
         if (files.length) {
-            for (const file of files) {
-                console.log('Is openai.files undefined?', openai.files);
-            const oaiFile = await openai.files.create({
-                file: await toFile(file.buffer, file.originalname),
+    for (const file of files) {
+        try {
+            console.log('--- [DEBUG] Starting upload for file:', file.originalname);
+
+            // Step 1: Prepare the file object using toFile
+            const fileForUpload = await toFile(file.buffer, file.originalname);
+            console.log('--- [DEBUG] Step 1/3 SUCCESS: File prepared by toFile.');
+
+            // Step 2: Get a reference to the files API
+            const filesApi = openai.files;
+            if (!filesApi || typeof filesApi.create !== 'function') {
+                // This check will fail if the .create method is missing for any reason
+                throw new Error('CRITICAL: openai.files object is invalid or missing the .create method!');
+            }
+            console.log('--- [DEBUG] Step 2/3 SUCCESS: openai.files object and .create method are valid.');
+
+            // Step 3: Execute the API call
+            console.log('--- [DEBUG] Attempting Step 3: Calling filesApi.create...');
+            const oaiFile = await filesApi.create({
+                file: fileForUpload,
                 purpose: 'assistants',
             });
+            console.log('--- [DEBUG] Step 3/3 SUCCESS: OpenAI file created with ID:', oaiFile.id);
+
             fileIds.push(oaiFile.id);
-            }
+
+        } catch (uploadError) {
+            // This will catch the error and give us a more detailed report
+            console.error('--- [DEBUG] ERROR during file upload process ---');
+            console.error(uploadError);
+            
+            // Send a proper error response to the frontend
+            return res.status(500).json({ message: 'An internal error occurred during file upload.', error: uploadError.message });
         }
+    }
+}
 
         // 2. Create a Vector Store if there are files
         let vectorStoreId;
