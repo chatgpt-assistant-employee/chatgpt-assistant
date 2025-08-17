@@ -265,30 +265,38 @@ app.use(express.json());
 
 app.set('trust proxy', 1);
 
-const allowedOrigins = new Set([FRONTEND_URL]);
+// Simple allow test (exact FRONTEND_URL, localhost, ANY *.vercel.app)
+const allowedOrigins = new Set([
+  FRONTEND_URL,
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+]);
 
-app.use(cors({
-  origin(origin, cb) {
-    // Allow server-to-server, curl, etc.
-    if (!origin) return cb(null, true);
+function isAllowedOrigin(origin) {
+  try {
+    const url = new URL(origin);
+    if (allowedOrigins.has(origin)) return true;
+    // allow any Vercel preview/prod
+    if (url.hostname.endsWith('.vercel.app') && url.protocol === 'https:') return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
 
-    try {
-      const host = new URL(origin).hostname;
-
-      if (
-        allowedOrigins.has(origin) ||         // exact deploy URL from FRONTEND_URL
-        host.endsWith('.vercel.app') ||       // any Vercel preview/prod
-        host.endsWith('.onrender.com') ||     // (optional) other render frontends
-        host === 'localhost'
-      ) {
-        return cb(null, true);
-      }
-    } catch (_) { /* ignore parse errors */ }
-
-    cb(new Error('CORS: This origin is not allowed: ' + origin));
-  },
-  credentials: true,
-}));
+// CORS middleware that works with credentials
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && isAllowedOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin); // must echo, not '*'
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
 
 // ✅ Express-5 safe preflight handler (no path pattern)
 app.use((req, res, next) => {
