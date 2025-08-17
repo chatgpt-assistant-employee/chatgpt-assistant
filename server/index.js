@@ -1462,6 +1462,7 @@ app.post('/api/assistant', isVerified, upload.any(), async (req, res) => {
         // 1. Upload files to OpenAI if they exist
         if (files.length) {
             for (const file of files) {
+                console.log('Is openai.files undefined?', openai.files);
             const oaiFile = await openai.files.create({
                 file: await toFile(file.buffer, file.originalname),
                 purpose: 'assistants',
