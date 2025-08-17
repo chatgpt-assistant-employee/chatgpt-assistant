@@ -18,7 +18,7 @@ function CreateAssistantPage({ onAssistantCreated }) {
 
   const handleFileChange = (event) => {
     // Add new files to the existing array
-    setFiles(prevFiles => [...prevFiles, ...Array.from(event.target.files)]);
+    setFiles(prev => [...prev, ...Array.from(event.target.files)]);
   };
   
   const handleRemoveFile = (fileIndex) => {

@@ -1531,9 +1531,15 @@ app.post('/api/assistant', isVerified, upload.any(), async (req, res) => {
         // 1. Upload files to OpenAI if they exist
         if (files.length) {
             for (const file of files) {
-            const oaiFile = await filesCreate({ file: await toFile(file.buffer, file.originalname), purpose: 'assistants' });
+            const fileForUpload = new File([file.buffer], file.originalname || 'upload', {
+                type: file.mimetype || 'application/octet-stream'
+            });
+            const oaiFile = await openai.files.create({
+                file: fileForUpload,
+                purpose: 'assistants',
+            });
             fileIds.push(oaiFile.id);
-            }
+        }
         }
 
         // 2. Create a Vector Store if there are files
@@ -1584,7 +1590,28 @@ app.get('/api/assistant/:id', isVerified, async (req, res) => {
         if (!assistant || assistant.userId !== req.session.userId) {
             return res.status(403).json({ message: 'Permission denied.' });
         }
-        res.json({ assistant });
+
+        const oaiAssistant = await openai.beta.assistants.retrieve(assistant.openaiAssistantId);
+        const vectorStoreId = oaiAssistant.tool_resources?.file_search?.vector_store_ids?.[0];
+
+        let files = [];
+        if (vectorStoreId) {
+        // List files attached to the vector store, then hydrate with filename/bytes
+        const listed = await openai.beta.vectorStores.files.list(vectorStoreId, { limit: 100 });
+        files = await Promise.all(
+            (listed.data || []).map(async (f) => {
+            const meta = await openai.files.retrieve(f.id);
+            return {
+                id: meta.id,
+                filename: meta.filename,
+                bytes: meta.bytes,
+                created_at: meta.created_at
+            };
+            })
+        );
+        }
+
+    res.json({ assistant, files });
     } catch (error) { res.status(500).json({ message: 'Failed to fetch assistant.' }); }
 });
 
@@ -1967,12 +1994,15 @@ app.post('/api/assistant/:assistantId/files', isVerified, upload.any(), async (r
 
         const uploaded = [];
         for (const f of files) {
-        const oaiFile = await openai.files.create({
-            file: await toFile(f.buffer, f.originalname),
-            purpose: 'assistants',
-        });
-        await openai.beta.vectorStores.files.create(vectorStoreId, { file_id: oaiFile.id });
-        uploaded.push({ id: oaiFile.id, name: f.originalname });
+            const fileForUpload = new File([f.buffer], f.originalname || 'upload', {
+                type: f.mimetype || 'application/octet-stream'
+            });
+            const oaiFile = await openai.files.create({
+                file: fileForUpload,
+                purpose: 'assistants',
+            });
+            await openai.beta.vectorStores.files.create(vectorStoreId, { file_id: oaiFile.id });
+            uploaded.push({ id: oaiFile.id, name: f.originalname || 'upload' });
         }
         res.status(201).json({ uploaded });
     } catch (error) { res.status(500).json({ message: 'Failed to add file.' }); }
