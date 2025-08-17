@@ -44,7 +44,66 @@ const PORT = process.env.PORT || 3001;
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const postmarkClient = new postmark.ServerClient(process.env.POSTMARK_API_TOKEN);
 
-console.log('OpenAI SDK version (runtime):', require('openai/package.json').version);
+const get = (obj, path) => path.split('.').reduce((o,k) => o?.[k], obj);
+
+// Files
+const filesCreate = (payload) => {
+  const fn = get(openai, 'files.create');
+  if (!fn) throw new Error('openai.files.create missing (check import/SDK).');
+  return fn.call(openai.files, payload);
+};
+const filesDel = (id) => {
+  const fn = get(openai, 'files.del');
+  if (!fn) throw new Error('openai.files.del missing.');
+  return fn.call(openai.files, id);
+};
+
+// Vector Stores
+const vsNS = () => get(openai, 'beta.vectorStores') ?? get(openai, 'vectorStores');
+const vsCreate = (payload) => {
+  const ns = vsNS(); if (!ns?.create) throw new Error('vectorStores.create missing.');
+  return ns.create(payload);
+};
+const vsDel = (id) => {
+  const ns = vsNS(); if (!ns?.del) throw new Error('vectorStores.del missing.');
+  return ns.del(id);
+};
+const vsFilesNS = () =>
+  get(openai, 'beta.vectorStores.files') ?? get(openai, 'vectorStores.files');
+const vsFilesCreate = (vsId, payload) => {
+  const ns = vsFilesNS(); if (!ns?.create) throw new Error('vectorStores.files.create missing.');
+  return ns.create(vsId, payload);
+};
+const vsFilesDel = (vsId, fileId) => {
+  const ns = vsFilesNS(); if (!ns?.del) throw new Error('vectorStores.files.del missing.');
+  return ns.del(vsId, fileId);
+};
+const vsFilesList = (vsId) => {
+  const ns = vsFilesNS(); if (!ns?.list) throw new Error('vectorStores.files.list missing.');
+  return ns.list(vsId);
+};
+
+// Assistants
+const asstNS = () => get(openai, 'beta.assistants') ?? get(openai, 'assistants');
+const asstCreate = (payload) => {
+  const ns = asstNS(); if (!ns?.create) throw new Error('assistants.create missing.');
+  return ns.create(payload);
+};
+const asstRetrieve = (id) => {
+  const ns = asstNS(); if (!ns?.retrieve) throw new Error('assistants.retrieve missing.');
+  return ns.retrieve(id);
+};
+const asstDel = (id) => {
+  const ns = asstNS(); if (!ns?.del) throw new Error('assistants.del missing.');
+  return ns.del(id);
+};
+
+// Threads (you also use beta.threads.messages.list elsewhere)
+const threadsMessagesList = (threadId) => {
+  const ns = get(openai, 'beta.threads.messages') ?? get(openai, 'threads.messages');
+  if (!ns?.list) throw new Error('threads.messages.list missing.');
+  return ns.list(threadId);
+};
 
 // Simple per‑assistant cache: { [assistantId]: { timestamp, threads } }
 const threadsCache = new Map();
@@ -1472,10 +1531,7 @@ app.post('/api/assistant', isVerified, upload.any(), async (req, res) => {
         // 1. Upload files to OpenAI if they exist
         if (files.length) {
             for (const file of files) {
-            const oaiFile = await openai.files.create({
-                file: await toFile(file.buffer, file.originalname),
-                purpose: 'assistants',
-            });
+            const oaiFile = await filesCreate({ file: await toFile(file.buffer, file.originalname), purpose: 'assistants' });
             fileIds.push(oaiFile.id);
             }
         }
@@ -1483,15 +1539,12 @@ app.post('/api/assistant', isVerified, upload.any(), async (req, res) => {
         // 2. Create a Vector Store if there are files
         let vectorStoreId;
         if (fileIds.length > 0) {
-            const vectorStore = await openai.beta.vectorStores.create({
-                name: `${name} Knowledge Base`,
-                file_ids: fileIds,
-            });
+            const vectorStore = await vsCreate({ name: `${name} Knowledge Base`, file_ids: fileIds });
             vectorStoreId = vectorStore.id;
         }
 
         // 3. Create the assistant on OpenAI's platform
-        const assistant = await openai.beta.assistants.create({
+        const assistant = await asstCreate ({
             name: name,
             instructions: instructions,
             model: "gpt-4o",
