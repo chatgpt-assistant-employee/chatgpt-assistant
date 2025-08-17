@@ -188,7 +188,7 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
             if (user) {
                 const userAssistants = await prisma.assistant.findMany({ where: { userId: user.id } });
                 for (const assistant of userAssistants) {
-                    try { await openai.assistants.del(assistant.openaiAssistantId); } catch (oaiError) { console.error(`Failed to delete OAI assistant ${assistant.openaiAssistantId}`); }
+                    try { await openai.beta.assistants.del(assistant.openaiAssistantId); } catch (oaiError) { console.error(`Failed to delete OAI assistant ${assistant.openaiAssistantId}`); }
                 }
                 await prisma.assistant.deleteMany({ where: { userId: user.id } });
                 await prisma.user.update({ where: { id: user.id }, data: { subscriptionStatus: 'inactive', plan: null, stripeSubscriptionId: null, basePlanLimit: 0, addOnSlots: 0, subscriptionEndsAt: null } });
@@ -1304,7 +1304,7 @@ app.post('/api/remove-assistant-subscription', isVerified, async (req, res) => {
         // Now, delete the actual assistant from OpenAI and our database
         const assistant = await prisma.assistant.findUnique({ where: { id: assistantIdToDelete } });
         if (assistant && assistant.userId === req.session.userId) {
-            await openai.assistants.del(assistant.openaiAssistantId);
+            await openai.beta.assistants.del(assistant.openaiAssistantId);
             await prisma.assistant.delete({ where: { id: assistantIdToDelete } });
         }
         const updatedSubscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
@@ -1461,47 +1461,19 @@ app.post('/api/assistant', isVerified, upload.any(), async (req, res) => {
 
         // 1. Upload files to OpenAI if they exist
         if (files.length) {
-    for (const file of files) {
-        try {
-            console.log('--- [DEBUG] Starting upload for file:', file.originalname);
-
-            // Step 1: Prepare the file object using toFile
-            const fileForUpload = await toFile(file.buffer, file.originalname);
-            console.log('--- [DEBUG] Step 1/3 SUCCESS: File prepared by toFile.');
-
-            // Step 2: Get a reference to the files API
-            const filesApi = openai.files;
-            if (!filesApi || typeof filesApi.create !== 'function') {
-                // This check will fail if the .create method is missing for any reason
-                throw new Error('CRITICAL: openai.files object is invalid or missing the .create method!');
-            }
-            console.log('--- [DEBUG] Step 2/3 SUCCESS: openai.files object and .create method are valid.');
-
-            // Step 3: Execute the API call
-            console.log('--- [DEBUG] Attempting Step 3: Calling filesApi.create...');
-            const oaiFile = await filesApi.create({
-                file: fileForUpload,
+            for (const file of files) {
+            const oaiFile = await openai.files.create({
+                file: await toFile(file.buffer, file.originalname),
                 purpose: 'assistants',
             });
-            console.log('--- [DEBUG] Step 3/3 SUCCESS: OpenAI file created with ID:', oaiFile.id);
-
             fileIds.push(oaiFile.id);
-
-        } catch (uploadError) {
-            // This will catch the error and give us a more detailed report 
-            console.error('--- [DEBUG] ERROR during file upload process ---');
-            console.error(uploadError);
-            
-            // Send a proper error response to the frontend
-            return res.status(500).json({ message: 'An internal error occurred during file upload.', error: uploadError.message });
+            }
         }
-    }
-}
 
         // 2. Create a Vector Store if there are files
         let vectorStoreId;
         if (fileIds.length > 0) {
-            const vectorStore = await openai.vectorStores.create({
+            const vectorStore = await openai.beta.vectorStores.create({
                 name: `${name} Knowledge Base`,
                 file_ids: fileIds,
             });
@@ -1509,7 +1481,7 @@ app.post('/api/assistant', isVerified, upload.any(), async (req, res) => {
         }
 
         // 3. Create the assistant on OpenAI's platform
-        const assistant = await openai.assistants.create({
+        const assistant = await openai.beta.assistants.create({
             name: name,
             instructions: instructions,
             model: "gpt-4o",
@@ -1571,7 +1543,7 @@ app.delete('/api/assistant/:id', isVerified, async (req, res) => {
         // --- NEW: FULL CLEANUP LOGIC FOR OPENAI ---
         try {
             // 1. Retrieve the assistant from OpenAI to find its resources
-            const assistant = await openai.assistants.retrieve(openaiAssistantId);
+            const assistant = await openai.beta.assistants.retrieve(openaiAssistantId);
             
             // 2. Find the attached Vector Store ID
             const vectorStoreId = assistant.tool_resources?.file_search?.vector_store_ids?.[0];
@@ -1579,20 +1551,20 @@ app.delete('/api/assistant/:id', isVerified, async (req, res) => {
             if (vectorStoreId) {
                 console.log(`Found Vector Store ${vectorStoreId} to delete.`);
                 // 3. List and delete all files within the Vector Store
-                const vectorStoreFiles = await openai.vectorStores.files.list(vectorStoreId);
+                const vectorStoreFiles = await openai.beta.vectorStores.files.list(vectorStoreId);
                 for (const file of vectorStoreFiles.data) {
-                    await openai.vectorStores.files.del(vectorStoreId, file.id);
+                    await openai.beta.vectorStores.files.del(vectorStoreId, file.id);
                     await openai.files.del(file.id); // Also delete the file object itself
                     console.log(`Deleted file ${file.id} from Vector Store.`);
                 }
                 
                 // 4. Delete the Vector Store itself
-                await openai.vectorStores.del(vectorStoreId);
+                await openai.beta.vectorStores.del(vectorStoreId);
                 console.log(`Deleted Vector Store ${vectorStoreId}.`);
             }
             
             // 5. Now, safely delete the assistant from OpenAI
-            await openai.assistants.del(openaiAssistantId);
+            await openai.beta.assistants.del(openaiAssistantId);
             console.log(`Assistant ${openaiAssistantId} deleted from OpenAI.`);
 
         } catch (oaiError) {
@@ -1781,8 +1753,8 @@ app.put('/api/assistant/:id', isVerified, async (req, res) => {
         if (!assistantInDb || assistantInDb.userId !== req.session.userId) {
             return res.status(403).json({ message: 'Permission denied.' });
         }
-        await openai.assistants.update(assistantInDb.openaiAssistantId, { name, instructions });
-        const updatedOaiAssistant = await openai.assistants.update(assistantInDb.openaiAssistantId, { name, instructions });
+        await openai.beta.assistants.update(assistantInDb.openaiAssistantId, { name, instructions });
+        const updatedOaiAssistant = await openai.beta.assistants.update(assistantInDb.openaiAssistantId, { name, instructions });
         const updatedDbAssistant = await prisma.assistant.update({ where: { id }, data: { name, instructions, avatarUrl, role } });
         res.json(updatedDbAssistant);
     } catch (error) { res.status(500).json({ message: 'Failed to update assistant.' }); }
@@ -1923,7 +1895,7 @@ app.post('/api/assistant/:assistantId/files', isVerified, upload.any(), async (r
         const assistant = user.assistants.find(a => a.id === assistantId);
         if (!assistant) return res.status(403).json({ message: 'Permission denied.' });
         
-        const oaiAssistant = await openai.assistants.retrieve(assistant.openaiAssistantId);
+        const oaiAssistant = await openai.beta.assistants.retrieve(assistant.openaiAssistantId);
         const vectorStoreId = oaiAssistant.tool_resources?.file_search?.vector_store_ids?.[0];
         if (!vectorStoreId) return res.status(400).json({ message: 'Assistant does not have a knowledge base.' });
 
@@ -1936,7 +1908,7 @@ app.post('/api/assistant/:assistantId/files', isVerified, upload.any(), async (r
             file: await toFile(f.buffer, f.originalname),
             purpose: 'assistants',
         });
-        await openai.vectorStores.files.create(vectorStoreId, { file_id: oaiFile.id });
+        await openai.beta.vectorStores.files.create(vectorStoreId, { file_id: oaiFile.id });
         uploaded.push({ id: oaiFile.id, name: f.originalname });
         }
         res.status(201).json({ uploaded });
@@ -1951,11 +1923,11 @@ app.delete('/api/assistant/:assistantId/files/:fileId', isVerified, async (req, 
         const assistant = user.assistants.find(a => a.id === assistantId);
         if (!assistant) return res.status(403).json({ message: 'Permission denied.' });
 
-        const oaiAssistant = await openai.assistants.retrieve(assistant.openaiAssistantId);
+        const oaiAssistant = await openai.beta.assistants.retrieve(assistant.openaiAssistantId);
         const vectorStoreId = oaiAssistant.tool_resources?.file_search?.vector_store_ids?.[0];
         if (!vectorStoreId) return res.status(400).json({ message: 'Assistant does not have a knowledge base.' });
 
-        await openai.vectorStores.files.del(vectorStoreId, fileId);
+        await openai.beta.vectorStores.files.del(vectorStoreId, fileId);
         await openai.files.del(fileId);
         res.status(204).send();
     } catch (error) { res.status(500).json({ message: 'Failed to remove file.' }); }
