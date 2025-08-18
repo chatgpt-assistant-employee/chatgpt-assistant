@@ -1991,34 +1991,48 @@ app.get('/api/emails/:assistantId', isVerified, async (req, res) => {
 
 // --- FILE MANAGEMENT (PER-ASSISTANT) ---
 app.post('/api/assistant/:assistantId/files', isVerified, upload.any(), async (req, res) => {
-    if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
-    try {
-        const { assistantId } = req.params;
-        const user = await prisma.user.findUnique({ where: { id: req.session.userId }, include: { assistants: true } });
-        const assistant = user.assistants.find(a => a.id === assistantId);
-        if (!assistant) return res.status(403).json({ message: 'Permission denied.' });
-        
-        const oaiAssistant = await openai.beta.assistants.retrieve(assistant.openaiAssistantId);
-        const vectorStoreId = oaiAssistant.tool_resources?.file_search?.vector_store_ids?.[0];
-        if (!vectorStoreId) return res.status(400).json({ message: 'Assistant does not have a knowledge base.' });
+  if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
+  try {
+    const { assistantId } = req.params;
 
-        const files = Array.isArray(req.files) ? req.files : [];
-        if (!files.length) return res.status(400).json({ message: 'No files uploaded.' });
+    // Owns it?
+    const user = await prisma.user.findUnique({ where: { id: req.session.userId }, include: { assistants: true } });
+    const assistant = user.assistants.find(a => a.id === assistantId);
+    if (!assistant) return res.status(403).json({ message: 'Permission denied.' });
 
-        const uploaded = [];
-        for (const f of files) {
-            const fileForUpload = new File([f.buffer], f.originalname || 'upload', {
-                type: f.mimetype || 'application/octet-stream'
-            });
-            const oaiFile = await openai.files.create({
-                file: fileForUpload,
-                purpose: 'assistants',
-            });
-            await openai.beta.vectorStores.files.create(vectorStoreId, { file_id: oaiFile.id });
-            uploaded.push({ id: oaiFile.id, name: f.originalname || 'upload' });
-        }
-        res.status(201).json({ uploaded });
-    } catch (error) { res.status(500).json({ message: 'Failed to add file.' }); }
+    // Get (or create) vector store
+    const oaiAssistant = await openai.beta.assistants.retrieve(assistant.openaiAssistantId);
+    let vectorStoreId = oaiAssistant.tool_resources?.file_search?.vector_store_ids?.[0];
+
+    // OPTIONAL: create/attach a vector store if none exists
+    if (!vectorStoreId) {
+      const vs = await (openai.beta.vectorStores?.create ?? openai.vectorStores.create)({ name: `${assistant.name} Knowledge Base` });
+      vectorStoreId = vs.id;
+      const asst = openai.beta.assistants ?? openai.assistants;
+      await asst.update(assistant.openaiAssistantId, {
+        tool_resources: { file_search: { vector_store_ids: [vectorStoreId] } },
+      });
+    }
+
+    // Accept single or multiple file fields
+    const incoming = Array.isArray(req.files) && req.files.length ? req.files : (req.file ? [req.file] : []);
+    if (!incoming.length) return res.status(400).json({ message: 'No files uploaded.' });
+
+    const uploaded = [];
+    for (const f of incoming) {
+      const fileForUpload = await toFile(f.buffer, f.originalname || 'upload', {
+        type: f.mimetype || 'application/octet-stream',
+      });
+      const oaiFile = await openai.files.create({ file: fileForUpload, purpose: 'assistants' });
+      await (openai.beta.vectorStores.files?.create ?? openai.vectorStores.files.create)(vectorStoreId, { file_id: oaiFile.id });
+      uploaded.push({ id: oaiFile.id, name: f.originalname || 'upload' });
+    }
+
+    res.status(201).json({ uploaded });
+  } catch (error) {
+    console.error('add-file failed:', error?.response?.data || error);
+    res.status(500).json({ message: 'Failed to add file.' });
+  }
 });
 
 app.delete('/api/assistant/:assistantId/files/:fileId', isVerified, async (req, res) => {
