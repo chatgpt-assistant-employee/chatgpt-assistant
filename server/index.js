@@ -52,14 +52,21 @@ const filesCreate = (payload) => {
   if (!fn) throw new Error('openai.files.create missing (check import/SDK).');
   return fn.call(openai.files, payload);
 };
-const filesDel = (id) => {
-  const delFn =
-    get(openai, 'files.del') ??
-    get(openai, 'files.delete') ??
-    get(openai, 'files.remove');
-  if (!delFn) throw new Error('openai.files.del/delete/remove missing.');
-  // call with `openai.files` as this
-  return delFn.call(openai.files, id);
+const filesDel = async (id) => {
+  // Some SDKs: files.del(id), others: files.delete(id), older: files.remove(id)
+  const fns = [
+    get(openai, 'files.del'),
+    get(openai, 'files.delete'),
+    get(openai, 'files.remove'),
+    get(openai, 'files.destroy'),
+  ].filter(Boolean);
+
+  if (!fns.length) throw new Error('openai.files.del/delete/remove missing.');
+  let lastErr;
+  for (const fn of fns) {
+    try { return await fn.call(openai.files, id); } catch (e) { lastErr = e; }
+  }
+  throw lastErr;
 };
 
 // Vector Stores
@@ -74,18 +81,43 @@ const vsDel = (id) => {
 };
 const vsFilesNS = () =>
   get(openai, 'beta.vectorStores.files') ?? get(openai, 'vectorStores.files');
-const vsFilesCreate = (vsId, payload) => {
-  const ns = vsFilesNS(); if (!ns?.create) throw new Error('vectorStores.files.create missing.');
-  return ns.create(vsId, payload);
+const vsFilesCreate = async (vsId, payload) => {
+  // Some SDKs: create(vsId, { file_id }), others: create({ vector_store_id, file_id })
+  const ns = vsFilesNS(); if (!ns) throw new Error('vectorStores.files namespace missing.');
+  const tryCalls = [
+    () => ns.create?.(vsId, payload),
+    () => ns.create?.({ vector_store_id: vsId, ...payload }),
+  ];
+  let lastErr;
+  for (const call of tryCalls) {
+    try {
+      const out = call();
+      if (out && typeof out.then === 'function') return await out;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr ?? new Error('vectorStores.files.create not available.');
 };
-const vsFilesDel = (vsId, fileId) => {
-  const ns =
-    get(openai, 'beta.vectorStores.files') ??
-    get(openai, 'vectorStores.files');
-  const delFn =
-    ns?.del ?? ns?.delete ?? ns?.remove ?? ns?.destroy;
-  if (!delFn) throw new Error('vectorStores.files.del/delete/remove missing.');
-  return delFn.call(ns, vsId, fileId);
+const vsFilesDel = async (vsId, fileId) => {
+  // Some SDKs: del(vsId, fileId), others: delete({ vector_store_id, file_id })
+  const ns = vsFilesNS(); if (!ns) throw new Error('vectorStores.files namespace missing.');
+  const tryCalls = [
+    () => ns.del?.(vsId, fileId),
+    () => ns.delete?.(vsId, fileId),
+    () => ns.remove?.(vsId, fileId),
+    () => ns.destroy?.(vsId, fileId),
+    () => ns.del?.({ vector_store_id: vsId, file_id: fileId }),
+    () => ns.delete?.({ vector_store_id: vsId, file_id: fileId }),
+    () => ns.remove?.({ vector_store_id: vsId, file_id: fileId }),
+    () => ns.destroy?.({ vector_store_id: vsId, file_id: fileId }),
+  ];
+  let lastErr;
+  for (const call of tryCalls) {
+    try {
+      const out = call();
+      if (out && typeof out.then === 'function') return await out;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr ?? new Error('vectorStores.files.del/delete/remove missing.');
 };
 const vsFilesList = (vsId) => {
   const ns = vsFilesNS(); if (!ns?.list) throw new Error('vectorStores.files.list missing.');
