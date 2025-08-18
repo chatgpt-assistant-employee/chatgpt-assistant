@@ -98,41 +98,41 @@ const vsFilesCreate = async (vsId, payload) => {
 
 const vsFilesDel = async (vsId, fileId) => {
   console.log('vsFilesDel called with:', { vsId, fileId });
-  
+
   if (!vsId) throw new Error(`vector_store_id required. Received: ${vsId}`);
   if (!fileId) throw new Error(`file_id required. Received: ${fileId}`);
-  
-  // Validate that parameters look correct
-  if (typeof vsId !== 'string' || !vsId.startsWith('vs_')) {
-    throw new Error(`Invalid vector_store_id format: ${vsId}. Expected to start with 'vs_'`);
+  if (!/^vs_/.test(vsId)) throw new Error(`Invalid vector_store_id format: ${vsId}`);
+  if (!/^file-/.test(fileId)) throw new Error(`Invalid file_id format: ${fileId}`);
+
+  const ns = vsFilesNS();
+  if (!ns) throw new Error('vectorStores.files namespace missing.');
+
+  // Prefer object-arg variants first (newer SDKs)
+  if (typeof ns.delete === 'function') {
+    try { return await ns.delete({ vector_store_id: vsId, file_id: fileId }); } catch {}
   }
-  if (typeof fileId !== 'string' || !fileId.startsWith('file-')) {
-    throw new Error(`Invalid file_id format: ${fileId}. Expected to start with 'file-'`);
+  if (typeof ns.del === 'function') {
+    try { return await ns.del({ vector_store_id: vsId, file_id: fileId }); } catch {}
   }
 
-  // Call OpenAI directly - this is the most reliable approach
-  try {
-    console.log('Calling openai.beta.vectorStores.files.delete');
-    await openai.beta.vectorStores.files.delete(vsId, fileId);
-    return { success: true };
-  } catch (error) {
-    console.log('beta.vectorStores.files.delete failed:', error.message);
-    
-    // Fallback: try without beta namespace
-    try {
-      console.log('Trying openai.vectorStores.files.delete');
-      await openai.vectorStores.files.delete(vsId, fileId);
-      return { success: true };
-    } catch (fallbackError) {
-      console.log('vectorStores.files.delete also failed:', fallbackError.message);
-      throw error; // Re-throw the original error
-    }
+  // Fallback to positional (older SDKs)
+  if (typeof ns.del === 'function') {
+    try { return await ns.del(vsId, fileId); } catch {}
   }
+  if (typeof ns.delete === 'function') {
+    try { return await ns.delete(vsId, fileId); } catch {}
+  }
+
+  throw new Error('No compatible vectorStores.files delete method found.');
 };
 
-const vsFilesList = (vsId) => {
-  const ns = vsFilesNS(); if (!ns?.list) throw new Error('vectorStores.files.list missing.');
-  return ns.list(vsId);
+const vsFilesList = async (vsId) => {
+  const ns = vsFilesNS();
+  if (!ns?.list) throw new Error('vectorStores.files.list missing.');
+  // Newer SDKs want an object; older SDKs accept positional.
+  try { return await ns.list({ vector_store_id: vsId }); } catch {
+    return ns.list(vsId);
+  }
 };
 
 // Assistants
