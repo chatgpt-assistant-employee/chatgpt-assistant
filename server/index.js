@@ -49,7 +49,7 @@ const get = (obj, path) => path.split('.').reduce((o,k) => o?.[k], obj);
 // Files
 const filesCreate = (payload) => {
   const fn = get(openai, 'files.create');
-  if (!fn) throw new Error('openai.files.create missing (check import/SDK).');
+  if (!fn) throw new Error('openai.files.create missing.');
   return fn.call(openai.files, payload);
 };
 const filesDel = async (id) => {
@@ -70,9 +70,11 @@ const filesDel = async (id) => {
 };
 
 // Vector Stores
-const vsNS = () => get(openai, 'beta.vectorStores') ?? get(openai, 'vectorStores');
+const vsNS = () =>
+  get(openai, 'beta.vectorStores') ?? get(openai, 'vectorStores');
 const vsCreate = (payload) => {
-  const ns = vsNS(); if (!ns?.create) throw new Error('vectorStores.create missing.');
+  const ns = vsNS();
+  if (!ns?.create) throw new Error('vectorStores.create missing.');
   return ns.create(payload);
 };
 const vsDel = (id) => {
@@ -82,42 +84,49 @@ const vsDel = (id) => {
 const vsFilesNS = () =>
   get(openai, 'beta.vectorStores.files') ?? get(openai, 'vectorStores.files');
 const vsFilesCreate = async (vsId, payload) => {
-  // Some SDKs: create(vsId, { file_id }), others: create({ vector_store_id, file_id })
-  const ns = vsFilesNS(); if (!ns) throw new Error('vectorStores.files namespace missing.');
-  const tryCalls = [
-    () => ns.create?.(vsId, payload),
-    () => ns.create?.({ vector_store_id: vsId, ...payload }),
-  ];
-  let lastErr;
-  for (const call of tryCalls) {
+  const ns = vsFilesNS();
+  if (!ns) throw new Error('vectorStores.files namespace missing.');
+
+  // Prefer object signature first
+  if (typeof ns.create === 'function') {
     try {
-      const out = call();
-      if (out && typeof out.then === 'function') return await out;
-    } catch (e) { lastErr = e; }
+      return await ns.create({ vector_store_id: vsId, ...payload });
+    } catch (e) {
+      // Fall back to positional if object form isn’t supported
+      return await ns.create(vsId, payload);
+    }
   }
-  throw lastErr ?? new Error('vectorStores.files.create not available.');
+  throw new Error('vectorStores.files.create missing.');
 };
 const vsFilesDel = async (vsId, fileId) => {
-  // Some SDKs: del(vsId, fileId), others: delete({ vector_store_id, file_id })
-  const ns = vsFilesNS(); if (!ns) throw new Error('vectorStores.files namespace missing.');
-  const tryCalls = [
-    () => ns.del?.(vsId, fileId),
-    () => ns.delete?.(vsId, fileId),
-    () => ns.remove?.(vsId, fileId),
-    () => ns.destroy?.(vsId, fileId),
-    () => ns.del?.({ vector_store_id: vsId, file_id: fileId }),
-    () => ns.delete?.({ vector_store_id: vsId, file_id: fileId }),
-    () => ns.remove?.({ vector_store_id: vsId, file_id: fileId }),
-    () => ns.destroy?.({ vector_store_id: vsId, file_id: fileId }),
-  ];
-  let lastErr;
-  for (const call of tryCalls) {
+  const ns = vsFilesNS();
+  if (!ns) throw new Error('vectorStores.files namespace missing.');
+
+  // 1) Try object signature (this is what your stacktrace expects)
+  if (typeof ns.delete === 'function') {
     try {
-      const out = call();
-      if (out && typeof out.then === 'function') return await out;
-    } catch (e) { lastErr = e; }
+      return await ns.delete({ vector_store_id: vsId, file_id: fileId });
+    } catch (e) {
+      // If this failed for a reason other than wrong signature, rethrow
+      // (e.g., network error or genuine 4xx/5xx)
+      if (!(e instanceof TypeError)) throw e;
+      // otherwise try positional fallbacks below
+    }
   }
-  throw lastErr ?? new Error('vectorStores.files.del/delete/remove missing.');
+
+  // 2) Try positional signatures across common method names
+  const candidates = ['del', 'remove', 'destroy', 'delete'];
+  let lastErr;
+  for (const m of candidates) {
+    const fn = ns[m];
+    if (typeof fn !== 'function') continue;
+    try {
+      return await fn.call(ns, vsId, fileId); // positional
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr ?? new Error('No vectorStores.files delete method worked.');
 };
 const vsFilesList = (vsId) => {
   const ns = vsFilesNS(); if (!ns?.list) throw new Error('vectorStores.files.list missing.');
