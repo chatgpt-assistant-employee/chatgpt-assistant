@@ -84,32 +84,30 @@ const vsFilesNS = () =>
 const vsFilesCreate = async (vsId, payload) => {
   const ns = vsFilesNS();
   if (!ns) throw new Error('vectorStores.files namespace missing.');
-
-  // Prefer object signature first
+  // Newer SDKs: create({ vector_store_id, file_id })
   if (typeof ns.create === 'function') {
     try {
       return await ns.create({ vector_store_id: vsId, ...payload });
     } catch (e) {
-      // Fall back to positional if object form isn’t supported
+      // If this SDK only supports positional, try that:
       return await ns.create(vsId, payload);
     }
   }
   throw new Error('vectorStores.files.create missing.');
 };
+
 const vsFilesDel = async (vsId, fileId) => {
-  const ns =
-    (openai.beta?.vectorStores?.files) ??
-    (openai.vectorStores?.files);
+  const ns = vsFilesNS();
   if (!ns) throw new Error('vectorStores.files namespace missing.');
   if (!vsId) throw new Error('vector_store_id required');
   if (!fileId) throw new Error('file_id required');
 
-  // Prefer the object signature (required by your current SDK)
+  // Newer SDKs: delete({ vector_store_id, file_id })
   if (typeof ns.delete === 'function') {
     return await ns.delete({ vector_store_id: vsId, file_id: fileId });
   }
 
-  // Fallbacks for older SDKs (positional)
+  // Older SDKs: del/remove/destroy(vsId, fileId)
   if (typeof ns.del === 'function')     return await ns.del(vsId, fileId);
   if (typeof ns.remove === 'function')  return await ns.remove(vsId, fileId);
   if (typeof ns.destroy === 'function') return await ns.destroy(vsId, fileId);
