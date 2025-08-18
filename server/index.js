@@ -135,6 +135,15 @@ const vsFilesDel = async (vsId, fileId) => {
   throw lastErr || new Error('No compatible vectorStores.files delete method found.');
 };
 
+const vsFilesList = async (vsId) => {
+  const ns = vsFilesNS();
+  if (!ns) throw new Error('vectorStores.files namespace missing.');
+  if (typeof ns.list !== 'function') throw new Error('vectorStores.files.list missing.');
+  try { return await ns.list({ vector_store_id: vsId }); } catch {
+    return ns.list(vsId);
+  }
+};
+
 // Assistants
 const asstNS = () => get(openai, 'beta.assistants') ?? get(openai, 'assistants');
 const asstCreate = (payload) => {
