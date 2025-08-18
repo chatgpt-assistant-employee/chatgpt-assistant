@@ -53,9 +53,13 @@ const filesCreate = (payload) => {
   return fn.call(openai.files, payload);
 };
 const filesDel = (id) => {
-  const fn = get(openai, 'files.del');
-  if (!fn) throw new Error('openai.files.del missing.');
-  return fn.call(openai.files, id);
+  const delFn =
+    get(openai, 'files.del') ??
+    get(openai, 'files.delete') ??
+    get(openai, 'files.remove');
+  if (!delFn) throw new Error('openai.files.del/delete/remove missing.');
+  // call with `openai.files` as this
+  return delFn.call(openai.files, id);
 };
 
 // Vector Stores
@@ -75,8 +79,13 @@ const vsFilesCreate = (vsId, payload) => {
   return ns.create(vsId, payload);
 };
 const vsFilesDel = (vsId, fileId) => {
-  const ns = vsFilesNS(); if (!ns?.del) throw new Error('vectorStores.files.del missing.');
-  return ns.del(vsId, fileId);
+  const ns =
+    get(openai, 'beta.vectorStores.files') ??
+    get(openai, 'vectorStores.files');
+  const delFn =
+    ns?.del ?? ns?.delete ?? ns?.remove ?? ns?.destroy;
+  if (!delFn) throw new Error('vectorStores.files.del/delete/remove missing.');
+  return delFn.call(ns, vsId, fileId);
 };
 const vsFilesList = (vsId) => {
   const ns = vsFilesNS(); if (!ns?.list) throw new Error('vectorStores.files.list missing.');
