@@ -97,31 +97,37 @@ const vsFilesCreate = async (vsId, payload) => {
 };
 
 const vsFilesDel = async (vsId, fileId) => {
-  const ns = vsFilesNS();
-  if (!ns) throw new Error('vectorStores.files namespace missing.');
-  if (!vsId) throw new Error('vector_store_id required');
-  if (!fileId) throw new Error('file_id required');
-
-  // FIXED: Try different parameter formats based on SDK version
-  if (typeof ns.delete === 'function') {
-    try {
-      // Try newer SDK format first (positional parameters)
-      return await ns.delete(vsId, fileId);
-    } catch (error) {
-      // If that fails, try the object format
-      if (error.message?.includes('Cannot destructure')) {
-        return await ns.delete({ vector_store_id: vsId, file_id: fileId });
-      }
-      throw error;
-    }
+  console.log('vsFilesDel called with:', { vsId, fileId });
+  
+  if (!vsId) throw new Error(`vector_store_id required. Received: ${vsId}`);
+  if (!fileId) throw new Error(`file_id required. Received: ${fileId}`);
+  
+  // Validate that parameters look correct
+  if (typeof vsId !== 'string' || !vsId.startsWith('vs_')) {
+    throw new Error(`Invalid vector_store_id format: ${vsId}. Expected to start with 'vs_'`);
+  }
+  if (typeof fileId !== 'string' || !fileId.startsWith('file-')) {
+    throw new Error(`Invalid file_id format: ${fileId}. Expected to start with 'file-'`);
   }
 
-  // Fallback methods for older SDKs
-  if (typeof ns.del === 'function')     return await ns.del(vsId, fileId);
-  if (typeof ns.remove === 'function')  return await ns.remove(vsId, fileId);
-  if (typeof ns.destroy === 'function') return await ns.destroy(vsId, fileId);
-
-  throw new Error('No vectorStores.files delete method found.');
+  // Call OpenAI directly - this is the most reliable approach
+  try {
+    console.log('Calling openai.beta.vectorStores.files.delete');
+    await openai.beta.vectorStores.files.delete(vsId, fileId);
+    return { success: true };
+  } catch (error) {
+    console.log('beta.vectorStores.files.delete failed:', error.message);
+    
+    // Fallback: try without beta namespace
+    try {
+      console.log('Trying openai.vectorStores.files.delete');
+      await openai.vectorStores.files.delete(vsId, fileId);
+      return { success: true };
+    } catch (fallbackError) {
+      console.log('vectorStores.files.delete also failed:', fallbackError.message);
+      throw error; // Re-throw the original error
+    }
+  }
 };
 
 const vsFilesList = (vsId) => {
