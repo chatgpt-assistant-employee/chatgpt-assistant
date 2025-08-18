@@ -99,34 +99,22 @@ const vsFilesCreate = async (vsId, payload) => {
   throw new Error('vectorStores.files.create missing.');
 };
 const vsFilesDel = async (vsId, fileId) => {
-  const ns = vsFilesNS();
+  const ns = (openai.beta?.vectorStores?.files) ?? openai.vectorStores?.files;
   if (!ns) throw new Error('vectorStores.files namespace missing.');
+  if (!vsId) throw new Error('vector_store_id required');
+  if (!fileId) throw new Error('file_id required');
 
-  // 1) Try object signature (this is what your stacktrace expects)
+  // Prefer the object signature (newer SDKs)
   if (typeof ns.delete === 'function') {
-    try {
-      return await ns.delete({ vector_store_id: vsId, file_id: fileId });
-    } catch (e) {
-      // If this failed for a reason other than wrong signature, rethrow
-      // (e.g., network error or genuine 4xx/5xx)
-      if (!(e instanceof TypeError)) throw e;
-      // otherwise try positional fallbacks below
-    }
+    return await ns.delete({ vector_store_id: vsId, file_id: fileId });
   }
 
-  // 2) Try positional signatures across common method names
-  const candidates = ['del', 'remove', 'destroy', 'delete'];
-  let lastErr;
-  for (const m of candidates) {
-    const fn = ns[m];
-    if (typeof fn !== 'function') continue;
-    try {
-      return await fn.call(ns, vsId, fileId); // positional
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-  throw lastErr ?? new Error('No vectorStores.files delete method worked.');
+  // Fall back to positional (older SDKs)
+  if (typeof ns.del === 'function') return await ns.del(vsId, fileId);
+  if (typeof ns.remove === 'function') return await ns.remove(vsId, fileId);
+  if (typeof ns.destroy === 'function') return await ns.destroy(vsId, fileId);
+
+  throw new Error('No vectorStores.files delete method found.');
 };
 const vsFilesList = (vsId) => {
   const ns = vsFilesNS(); if (!ns?.list) throw new Error('vectorStores.files.list missing.');
