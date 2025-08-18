@@ -1995,43 +1995,49 @@ app.post('/api/assistant/:assistantId/files', isVerified, upload.any(), async (r
   try {
     const { assistantId } = req.params;
 
-    // Owns it?
+    // Ownership
     const user = await prisma.user.findUnique({ where: { id: req.session.userId }, include: { assistants: true } });
     const assistant = user.assistants.find(a => a.id === assistantId);
     if (!assistant) return res.status(403).json({ message: 'Permission denied.' });
 
-    // Get (or create) vector store
-    const oaiAssistant = await openai.beta.assistants.retrieve(assistant.openaiAssistantId);
+    // Get OpenAI assistant via helper (works across SDK versions)
+    const oaiAssistant = await asstRetrieve(assistant.openaiAssistantId); // <-- helper
     let vectorStoreId = oaiAssistant.tool_resources?.file_search?.vector_store_ids?.[0];
 
-    // OPTIONAL: create/attach a vector store if none exists
+    // If no VS yet, create + attach one so uploads always work
     if (!vectorStoreId) {
-      const vs = await (openai.beta.vectorStores?.create ?? openai.vectorStores.create)({ name: `${assistant.name} Knowledge Base` });
+      const vs = await vsCreate({ name: `${assistant.name} Knowledge Base` }); // <-- helper
       vectorStoreId = vs.id;
-      const asst = openai.beta.assistants ?? openai.assistants;
-      await asst.update(assistant.openaiAssistantId, {
+
+      // Update assistant to reference the newly created VS (handle beta/non-beta)
+      const asstNs = (openai.beta?.assistants) ?? openai.assistants;
+      await asstNs.update(assistant.openaiAssistantId, {
         tool_resources: { file_search: { vector_store_ids: [vectorStoreId] } },
       });
     }
 
-    // Accept single or multiple file fields
+    // Accept single or multiple uploads
     const incoming = Array.isArray(req.files) && req.files.length ? req.files : (req.file ? [req.file] : []);
     if (!incoming.length) return res.status(400).json({ message: 'No files uploaded.' });
 
     const uploaded = [];
     for (const f of incoming) {
+      // Node-safe file conversion
       const fileForUpload = await toFile(f.buffer, f.originalname || 'upload', {
         type: f.mimetype || 'application/octet-stream',
       });
-      const oaiFile = await openai.files.create({ file: fileForUpload, purpose: 'assistants' });
-      await (openai.beta.vectorStores.files?.create ?? openai.vectorStores.files.create)(vectorStoreId, { file_id: oaiFile.id });
+
+      // Create file + attach to vector store (helpers)
+      const oaiFile = await filesCreate({ file: fileForUpload, purpose: 'assistants' });
+      await vsFilesCreate(vectorStoreId, { file_id: oaiFile.id });
+
       uploaded.push({ id: oaiFile.id, name: f.originalname || 'upload' });
     }
 
-    res.status(201).json({ uploaded });
+    return res.status(201).json({ uploaded });
   } catch (error) {
-    console.error('add-file failed:', error?.response?.data || error);
-    res.status(500).json({ message: 'Failed to add file.' });
+    console.error('add-file failed:', error?.status, error?.message, error?.response?.data || error);
+    return res.status(500).json({ message: 'Failed to add file.' });
   }
 });
 

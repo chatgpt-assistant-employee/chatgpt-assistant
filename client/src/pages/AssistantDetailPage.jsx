@@ -381,7 +381,7 @@ function AssistantDetailPage() {
         const file = event.target.files[0];
         if (!file) return;
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('files', file);
         try {
             await fetch(`${import.meta.env.VITE_API_URL}/api/assistant/${id}/files`, {
                 method: 'POST',
