@@ -60,7 +60,7 @@ function AuthPage({ onLoginSuccess }) {
       <Paper elevation={3} sx={{ p: 4, borderRadius: 4, width: '100%', maxWidth: '420px', textAlign: 'center' }}>
         {/* --- NEW: Logo is added here --- */}
         <Box sx={{ mb: 3 }}>
-            <img src="/logo.png" alt="App Logo" style={{ height: '180px', filter: 'drop-shadow(0 0 8px rgba(124, 244, 248, .45))' }} />
+            <img src="/logo1.jpg" alt="App Logo" style={{ height: '180px', filter: 'drop-shadow(0 0 8px rgba(124, 244, 248, .45))' }} />
         </Box>
         {selectedPlan && !isLoginView && (
                 <Box sx={{mb: 2, p: 2, bgcolor: 'primary.lighter', borderRadius: 2}}>
