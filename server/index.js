@@ -1593,32 +1593,38 @@ app.get('/api/assistant/:id', isVerified, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Owns it?
+    // Verify ownership
     const dbAssistant = await prisma.assistant.findUnique({ where: { id } });
     if (!dbAssistant || dbAssistant.userId !== req.session.userId) {
       return res.status(403).json({ message: 'Permission denied.' });
     }
 
-    // Fetch OpenAI assistant -> vector store -> files (with filename/bytes)
-    const oaiAssistant = await openai.beta.assistants.retrieve(dbAssistant.openaiAssistantId);
-    const vectorStoreId = oaiAssistant.tool_resources?.file_search?.vector_store_ids?.[0];
-
+    // Try to fetch OpenAI resources using helpers that work across SDKs.
     let files = [];
-    if (vectorStoreId) {
-      const list = await openai.beta.vectorStores.files.list(vectorStoreId);
-      const detailed = await Promise.all(
-        (list.data || []).map(async (item) => {
-          const f = await openai.files.retrieve(item.id);
-          return { id: f.id, filename: f.filename, bytes: f.bytes };
-        })
-      );
-      files = detailed;
+    try {
+      const oaiAssistant = await asstRetrieve(dbAssistant.openaiAssistantId); // <-- use helper
+      const vectorStoreId = oaiAssistant.tool_resources?.file_search?.vector_store_ids?.[0];
+
+      if (vectorStoreId) {
+        const list = await vsFilesList(vectorStoreId);     // <-- use helper
+        const detailed = await Promise.all(
+          (list.data || []).map(async (item) => {
+            const f = await openai.files.retrieve(item.id);
+            return { id: f.id, filename: f.filename, bytes: f.bytes };
+          })
+        );
+        files = detailed;
+      }
+    } catch (oaiErr) {
+      console.warn('OpenAI assistant lookup failed; returning DB assistant anyway:', oaiErr?.message || oaiErr);
+      // Optional: include a flag so the UI can show a soft warning
+      // return res.json({ assistant: dbAssistant, files, openaiStatus: 'unavailable' });
     }
 
-    res.json({ assistant: dbAssistant, files });
+    return res.json({ assistant: dbAssistant, files });
   } catch (error) {
     console.error('Failed to fetch assistant:', error);
-    res.status(500).json({ message: 'Failed to fetch assistant.' });
+    return res.status(500).json({ message: 'Failed to fetch assistant.' });
   }
 });
 
