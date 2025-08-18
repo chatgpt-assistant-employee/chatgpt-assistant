@@ -96,43 +96,20 @@ const vsFilesCreate = async (vsId, payload) => {
   throw new Error('vectorStores.files.create missing.');
 };
 
-const vsFilesDel = async (vsId, fileId) => {
-  console.log('vsFilesDel called with:', { vsId, fileId });
-
-  if (!vsId) throw new Error(`vector_store_id required. Received: ${vsId}`);
-  if (!fileId) throw new Error(`file_id required. Received: ${fileId}`);
-  if (typeof vsId !== 'string' || !vsId.startsWith('vs_')) {
-    throw new Error(`Invalid vector_store_id format: ${vsId}. Expected to start with 'vs_'`);
-  }
-  if (typeof fileId !== 'string' || !fileId.startsWith('file-')) {
-    throw new Error(`Invalid file_id format: ${fileId}. Expected to start with 'file-'`);
-  }
-
+const vsFilesDel = (vsId, fileId) => {
   const ns = vsFilesNS();
-  if (!ns) throw new Error('vectorStores.files namespace missing.');
-
-  // Helpful diagnostics so your logs show what methods exist at runtime
-  try { console.log('vectorStores.files keys:', Object.keys(ns)); } catch {}
-
-  const methodNames = ['delete', 'del', 'remove', 'destroy'];
-  let lastErr;
-
-  for (const name of methodNames) {
-    const fn = ns[name];
-    if (typeof fn !== 'function') continue;
-
-    // Prefer the object-arg form first (newer SDKs)
-    try {
-      return await fn.call(ns, { vector_store_id: vsId, file_id: fileId });
-    } catch (e1) { lastErr = e1; }
-
-    // Fallback to positional (older SDKs)
-    try {
-      return await fn.call(ns, vsId, fileId);
-    } catch (e2) { lastErr = e2; }
+  if (!ns) {
+      throw new Error('vectorStores.files namespace missing.');
   }
 
-  throw lastErr || new Error('No compatible vectorStores.files delete method found.');
+  // Find the correct delete function ('del' is common, 'delete' is an alias)
+  const del = ns.del ?? ns.delete;
+  if (typeof del !== 'function') {
+      throw new Error('No compatible vectorStores.files delete method found.');
+  }
+  
+  // Call the function directly with arguments in the correct order: (vector_store_id, file_id)
+  return del.call(ns, vsId, fileId);
 };
 
 const vsFilesList = async (vsId) => {
