@@ -2042,21 +2042,35 @@ app.post('/api/assistant/:assistantId/files', isVerified, upload.any(), async (r
 });
 
 app.delete('/api/assistant/:assistantId/files/:fileId', isVerified, async (req, res) => {
-    if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
-    try {
-        const { assistantId, fileId } = req.params;
-        const user = await prisma.user.findUnique({ where: { id: req.session.userId }, include: { assistants: true } });
-        const assistant = user.assistants.find(a => a.id === assistantId);
-        if (!assistant) return res.status(403).json({ message: 'Permission denied.' });
+  if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
+  try {
+    const { assistantId, fileId } = req.params;
 
-        const oaiAssistant = await openai.beta.assistants.retrieve(assistant.openaiAssistantId);
-        const vectorStoreId = oaiAssistant.tool_resources?.file_search?.vector_store_ids?.[0];
-        if (!vectorStoreId) return res.status(400).json({ message: 'Assistant does not have a knowledge base.' });
+    // Ownership
+    const user = await prisma.user.findUnique({ where: { id: req.session.userId }, include: { assistants: true } });
+    const assistant = user.assistants.find(a => a.id === assistantId);
+    if (!assistant) return res.status(403).json({ message: 'Permission denied.' });
 
-        await openai.beta.vectorStores.files.del(vectorStoreId, fileId);
-        await openai.files.del(fileId);
-        res.status(204).send();
-    } catch (error) { res.status(500).json({ message: 'Failed to remove file.' }); }
+    // Use helper (handles beta vs non-beta)
+    const oaiAssistant = await asstRetrieve(assistant.openaiAssistantId);
+    const vectorStoreId = oaiAssistant.tool_resources?.file_search?.vector_store_ids?.[0];
+
+    // If no VS is attached, there is nothing to detach—treat as success.
+    if (!vectorStoreId) return res.status(204).send();
+
+    // Detach from vector store; ignore "not found" so deletes are idempotent.
+    try { await vsFilesDel(vectorStoreId, fileId); } 
+    catch (e) { if (e?.status !== 404) throw e; }
+
+    // Delete the File object itself; also ignore 404.
+    try { await filesDel(fileId); } 
+    catch (e) { if (e?.status !== 404) throw e; }
+
+    return res.status(204).send();
+  } catch (error) {
+    console.error('remove-file failed:', error?.status, error?.message, error?.response?.data || error);
+    return res.status(500).json({ message: 'Failed to remove file.' });
+  }
 });
 
 // GET A LIST OF THREADS for a specific assistant
