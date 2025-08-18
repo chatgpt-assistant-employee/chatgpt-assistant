@@ -2103,18 +2103,49 @@ app.delete('/api/assistant/:assistantId/files/:fileId', isVerified, async (req, 
 
     // Use cross-version helper (works with/without beta)
     const oaiAssistant = await asstRetrieve(assistant.openaiAssistantId);
+    
+    // Add detailed logging
+    console.log('Assistant tool_resources:', JSON.stringify(oaiAssistant.tool_resources, null, 2));
+    
     const vectorStoreId = oaiAssistant.tool_resources?.file_search?.vector_store_ids?.[0];
+    
+    console.log('Extracted vectorStoreId:', vectorStoreId);
+    console.log('FileId to delete:', fileId);
 
     // If no VS, nothing to detach — treat as success
-    if (!vectorStoreId) return res.status(204).send();
+    if (!vectorStoreId) {
+      console.log('No vector store found, returning success');
+      return res.status(204).send();
+    }
+
+    // Validate that we have valid IDs before proceeding
+    if (!vectorStoreId.startsWith('vs_')) {
+      console.error('Invalid vector store ID format:', vectorStoreId);
+      return res.status(500).json({ message: 'Invalid vector store ID format.' });
+    }
+    
+    if (!fileId.startsWith('file-')) {
+      console.error('Invalid file ID format:', fileId);
+      return res.status(400).json({ message: 'Invalid file ID format.' });
+    }
 
     // Detach from Vector Store (ignore 404s to be idempotent)
-    try { await vsFilesDel(vectorStoreId, fileId); } catch (e) {
+    console.log(`Attempting to detach file ${fileId} from vector store ${vectorStoreId}`);
+    try { 
+      await vsFilesDel(vectorStoreId, fileId); 
+      console.log('Successfully detached file from vector store');
+    } catch (e) {
+      console.log('Error detaching file from vector store:', e.message);
       if (e?.status !== 404) throw e;
     }
 
     // Delete the File object (ignore 404s)
-    try { await filesDel(fileId); } catch (e) {
+    console.log(`Attempting to delete file ${fileId}`);
+    try { 
+      await filesDel(fileId); 
+      console.log('Successfully deleted file');
+    } catch (e) {
+      console.log('Error deleting file:', e.message);
       if (e?.status !== 404) throw e;
     }
 
