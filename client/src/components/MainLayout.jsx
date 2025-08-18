@@ -83,7 +83,7 @@ function MainLayout() {
   const drawerContent = (
     <>
       <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '64px', mt: 5, mb: 5 }}>
-        <img src="/logo1.jpg" alt="App Logo" style={{ height: '100px', marginBottom: '8px', filter: 'drop-shadow(0 0 8px rgba(124, 244, 248, .45))' }} />
+        <img src="/logo2.png" alt="App Logo" style={{ height: '100px', marginBottom: '8px', filter: 'drop-shadow(0 0 8px rgba(124, 244, 248, .45))' }} />
         <Typography variant="h5" fontWeight="bold" color="primary" sx={{mt: -1, textShadow: '0 0 8px rgba(124,244,248,.45)'}}>
           ChatGPT Assistant
         </Typography>
