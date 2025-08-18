@@ -102,12 +102,21 @@ const vsFilesDel = async (vsId, fileId) => {
   if (!vsId) throw new Error('vector_store_id required');
   if (!fileId) throw new Error('file_id required');
 
-  // Newer SDKs: delete({ vector_store_id, file_id })
+  // FIXED: Try different parameter formats based on SDK version
   if (typeof ns.delete === 'function') {
-    return await ns.delete({ vector_store_id: vsId, file_id: fileId });
+    try {
+      // Try newer SDK format first (positional parameters)
+      return await ns.delete(vsId, fileId);
+    } catch (error) {
+      // If that fails, try the object format
+      if (error.message?.includes('Cannot destructure')) {
+        return await ns.delete({ vector_store_id: vsId, file_id: fileId });
+      }
+      throw error;
+    }
   }
 
-  // Older SDKs: del/remove/destroy(vsId, fileId)
+  // Fallback methods for older SDKs
   if (typeof ns.del === 'function')     return await ns.del(vsId, fileId);
   if (typeof ns.remove === 'function')  return await ns.remove(vsId, fileId);
   if (typeof ns.destroy === 'function') return await ns.destroy(vsId, fileId);
