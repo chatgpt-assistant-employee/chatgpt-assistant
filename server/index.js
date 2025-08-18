@@ -96,29 +96,67 @@ const vsFilesCreate = async (vsId, payload) => {
   throw new Error('vectorStores.files.create missing.');
 };
 
-const vsFilesDel = (vsId, fileId) => {
-  const ns = vsFilesNS();
-  if (!ns) {
-      throw new Error('vectorStores.files namespace missing.');
+const vsFilesDel = async (vsId, fileId) => {
+  console.log('vsFilesDel called with:', { vsId, fileId });
+
+  if (!vsId) throw new Error(`vector_store_id required. Received: ${vsId}`);
+  if (!fileId) throw new Error(`file_id required. Received: ${fileId}`);
+  if (!/^vs_/.test(vsId)) throw new Error(`Invalid vector_store_id: ${vsId}`);
+  if (!/^file-/.test(fileId)) throw new Error(`Invalid file_id: ${fileId}`);
+
+  const ns =
+    get(openai, 'beta.vectorStores.files') ??
+    get(openai, 'vectorStores.files');
+
+  // Build a stack of attempts to survive SDK differences
+  const attempts = [];
+
+  // Namespaced methods if present
+  const methodNames = ['delete', 'del', 'remove', 'destroy'].filter(
+    (m) => typeof ns?.[m] === 'function'
+  );
+
+  for (const m of methodNames) {
+    // object – camelCase
+    attempts.push(() => ns[m].call(ns, { vectorStoreId: vsId, fileId }));
+    // object – snake_case
+    attempts.push(() => ns[m].call(ns, { vector_store_id: vsId, file_id: fileId }));
+    // positional (common)
+    attempts.push(() => ns[m].call(ns, vsId, fileId));
+    // positional (reversed; some pre-release builds expected this)
+    attempts.push(() => ns[m].call(ns, fileId, vsId));
   }
 
-  // Find the correct delete function ('del' is common, 'delete' is an alias)
-  const del = ns.del ?? ns.delete;
-  if (typeof del !== 'function') {
-      throw new Error('No compatible vectorStores.files delete method found.');
+  // Raw HTTP fallback (bypasses SDK param shims)
+  attempts.push(() =>
+    openai.delete(`/vector_stores/${vsId}/files/${fileId}`, {
+      headers: { 'OpenAI-Beta': 'assistants=v2' }, // harmless if not required
+    })
+  );
+
+  let lastErr;
+  for (const run of attempts) {
+    try {
+      await run();
+      return { success: true };
+    } catch (e) {
+      lastErr = e;
+      console.log('vsFilesDel attempt failed:', e?.message);
+    }
   }
-  
-  // Call the function directly with arguments in the correct order: (vector_store_id, file_id)
-  return del.call(ns, vsId, fileId);
+  throw lastErr;
 };
 
 const vsFilesList = async (vsId) => {
-  const ns = vsFilesNS();
+  const ns =
+    get(openai, 'beta.vectorStores.files') ??
+    get(openai, 'vectorStores.files');
   if (!ns) throw new Error('vectorStores.files namespace missing.');
-  if (typeof ns.list !== 'function') throw new Error('vectorStores.files.list missing.');
-  try { return await ns.list({ vector_store_id: vsId }); } catch {
-    return ns.list(vsId);
-  }
+
+  // Try new & old shapes
+  try { return await ns.list({ vectorStoreId: vsId }); } catch (_) {}
+  try { return await ns.list({ vector_store_id: vsId }); } catch (_) {}
+  return await ns.list(vsId); // classic positional
 };
 
 // Assistants
