@@ -20,7 +20,8 @@ import {
     useMediaQuery,
     IconButton,
     Avatar,
-    Tooltip
+    Tooltip,
+    Alert
 } from '@mui/material';
 import { Send as SendIcon, Add as AddIcon, ArrowBack as ArrowBackIcon, SmartToy as SmartToyIcon, Edit as EditIcon } from '@mui/icons-material';
 import AssistantPicker from '../components/AssistantPicker';
@@ -38,10 +39,22 @@ function ChatPage() {
     const [view, setView] = useState('history');
     const [editingThreadId, setEditingThreadId] = useState(null);
     const [editingTitle, setEditingTitle] = useState('');
+    const [usage, setUsage] = useState(null); // { plan, monthKey, limit, used, remaining }
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
     };
+
+    const fetchUsage = async () => {
+        try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/usage`, { credentials: 'include' });
+        if (res.ok) setUsage(await res.json());
+        } catch (e) {
+        console.error('Failed to fetch chat usage:', e);
+        }
+    };
+
+    useEffect(() => { fetchUsage(); }, []);
 
     // All handler functions and useEffect hooks remain the same
     useEffect(() => {
@@ -128,6 +141,11 @@ function ChatPage() {
     
     const handleSendMessage = async () => {
         if (!currentMessage.trim() || !selectedAssistant) return;
+        if (usage && usage.remaining <= 0) {
+            // hard stop if out of messages
+            return;
+        }
+
         const userMessage = { role: 'user', content: currentMessage };
         setCurrentThread(prev => ({ ...prev, messages: [...prev.messages, userMessage] }));
         const messageToSend = currentMessage;
@@ -144,10 +162,15 @@ function ChatPage() {
             const data = await response.json();
             if (response.ok) {
                 setCurrentThread(prev => ({ id: data.threadId, messages: [...prev.messages, { role: 'assistant', content: data.reply }] }));
+                if (data.usage) setUsage(data.usage); else fetchUsage();
                 if (!currentThread.id) { // If it was a new chat, refresh history
                     const res = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/threads/${selectedAssistant}`, { credentials: 'include' });
                     if (res.ok) setChatThreads(await res.json());
                 }
+                } else if (data?.limitReached) {
+                // revert the optimistic user message if the server rejected due to cap
+                setCurrentThread(prev => ({ ...prev, messages: prev.messages.slice(0, -1) }));
+                if (data.usage) setUsage(data.usage); else fetchUsage();
             }
         } catch (error) { console.error("Chat error:", error); } 
         finally { setIsLoading(false); }
@@ -219,6 +242,11 @@ function ChatPage() {
             
             {/* --- THIS IS THE SCROLLABLE CHAT AREA --- */}
             <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column' }}>
+                {usage && usage.remaining <= 0 && (
+                  <Alert severity="warning" sx={{ mb: 2 }}>
+                    You’ve reached your monthly chat limit ({usage.limit} messages for {usage.plan}).
+                  </Alert>
+                )}
                 {/* --- THIS IS THE NEW LOGIC --- */}
                 {currentThread.messages.length === 0 ? (
                     // Show this welcome message if the chat is empty
@@ -255,8 +283,8 @@ function ChatPage() {
             </Box>
 
             <Box component="form" sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }} onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}>
-                <TextField fullWidth variant="outlined" placeholder="Enter your message..." value={currentMessage} onChange={(e) => setCurrentMessage(e.target.value)} disabled={isLoading} />
-                <Button type="submit" variant="contained" endIcon={<SendIcon />} disabled={isLoading} sx={{ mt: 1 }}>Send</Button>
+                <TextField fullWidth variant="outlined" placeholder="Enter your message..." value={currentMessage} onChange={(e) => setCurrentMessage(e.target.value)} disabled={isLoading || (usage && usage.remaining <= 0)} />
+                <Button type="submit" variant="contained" endIcon={<SendIcon />} disabled={isLoading || (usage && usage.remaining <= 0)} sx={{ mt: 1 }}>Send</Button>
             </Box>
         </Paper>
     );

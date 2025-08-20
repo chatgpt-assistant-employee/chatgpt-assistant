@@ -23,6 +23,9 @@ const fs   = require('fs');
 const path = require('path');
 const cron = require('node-cron');
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const PLAN_LIMITS = { BASIC: 100, GOLD: 300, PLATINUM: 1000 };
+const monthKey = (d = new Date()) =>
+  `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -2902,47 +2905,106 @@ app.get('/api/chat/thread/:threadId', isVerified, async (req, res) => {
 
 // Replace your existing /api/chat route with this updated version
 app.post('/api/chat', isVerified, async (req, res) => {
-    if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
-    try {
-        let { assistantId, message, threadId } = req.body;
-        const assistantInDb = await prisma.assistant.findFirst({ where: { id: assistantId, userId: req.session.userId } });
-        if (!assistantInDb) return res.status(403).json({ message: 'Permission denied.' });
+  if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
+  try {
+    let { assistantId, message, threadId } = req.body;
 
-        // If no threadId is provided, create a new one AND save it to our database
-        if (!threadId) {
-            const thread = await openai.beta.threads.create();
-            threadId = thread.id;
-            
-            // Generate a title for the new chat
-            const titleCompletion = await openai.chat.completions.create({
-                model: 'gpt-3.5-turbo',
-                messages: [{ role: 'user', content: `Summarize the following message in 5 words or less to use as a chat title: "${message}"` }],
-            });
-            const title = titleCompletion.choices[0].message.content;
+    // Verify ownership (you already do this)
+    const assistantInDb = await prisma.assistant.findFirst({
+      where: { id: assistantId, userId: req.session.userId }
+    });
+    if (!assistantInDb) return res.status(403).json({ message: 'Permission denied.' });
 
-            await prisma.chatThread.create({
-                data: {
-                    openaiThreadId: threadId,
-                    title: title,
-                    assistantId: assistantId,
-                }
-            });
-        }
+    // ─── NEW: usage gate ────────────────────────────────────────────────────────
+    const user = await prisma.user.findUnique({ where: { id: req.session.userId } });
+    const limit = PLAN_LIMITS[user?.plan] ?? 100;
+    const key = monthKey();
 
-        await openai.beta.threads.messages.create(threadId, { role: 'user', content: message });
-        const run = await openai.beta.threads.runs.createAndPoll(threadId, { assistant_id: assistantInDb.openaiAssistantId });
+    // ensure row exists
+    let usageRow = await prisma.chatUsage.upsert({
+      where: { userId_monthKey: { userId: user.id, monthKey: key } },
+      create: { userId: user.id, monthKey: key, used: 0 },
+      update: {}
+    });
 
-        if (run.status === 'completed') {
-            const messages = await openai.beta.threads.messages.list(threadId);
-            const response = messages.data[0].content[0].text.value;
-            res.json({ reply: response, threadId: threadId });
-        } else {
-            res.status(500).json({ message: `AI Run failed with status: ${run.status}` });
-        }
-    } catch (error) {
-        console.error('Error in chat route:', error);
-        res.status(500).json({ message: 'Failed to get chat response.' });
+    if (usageRow.used >= limit) {
+      return res.status(403).json({
+        message: 'Monthly chat limit reached.',
+        limitReached: true,
+        usage: { plan: user?.plan || 'BASIC', monthKey: key, limit, used: usageRow.used, remaining: 0 }
+      });
     }
+    // ───────────────────────────────────────────────────────────────────────────
+
+    // Create new OAI thread + title when needed (your original code)
+    if (!threadId) {
+      const thread = await openai.beta.threads.create();
+      threadId = thread.id;
+
+      const titleCompletion = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: `Summarize the following message in 5 words or less to use as a chat title: "${message}"` }],
+      });
+      const title = titleCompletion.choices[0].message.content;
+
+      await prisma.chatThread.create({
+        data: {
+          openaiThreadId: threadId,
+          title,
+          assistantId
+        }
+      });
+    }
+
+    // push user message + run assistant (your original code)
+    await openai.beta.threads.messages.create(threadId, { role: 'user', content: message });
+    const run = await openai.beta.threads.runs.createAndPoll(threadId, { assistant_id: assistantInDb.openaiAssistantId });
+
+    if (run.status === 'completed') {
+      const messages = await openai.beta.threads.messages.list(threadId);
+      const reply = messages.data[0].content[0].text.value;
+
+      // ─── NEW: increment usage only after success ─────────────────────────────
+      usageRow = await prisma.chatUsage.update({
+        where: { userId_monthKey: { userId: user.id, monthKey: key } },
+        data: { used: { increment: 1 } }
+      });
+      const remaining = Math.max(0, limit - usageRow.used);
+      // ─────────────────────────────────────────────────────────────────────────
+
+      return res.json({
+        reply,
+        threadId,
+        usage: { plan: user?.plan || 'BASIC', monthKey: key, limit, used: usageRow.used, remaining }
+      });
+    } else {
+      return res.status(500).json({ message: `AI Run failed with status: ${run.status}` });
+    }
+  } catch (error) {
+    console.error('Error in chat route:', error);
+    res.status(500).json({ message: 'Failed to get chat response.' });
+  }
+});
+
+app.get('/api/chat/usage', isVerified, async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
+
+  const user = await prisma.user.findUnique({ where: { id: req.session.userId } });
+  const limit = PLAN_LIMITS[user?.plan] ?? 100;
+  const key = monthKey();
+
+  const row = await prisma.chatUsage.findUnique({
+    where: { userId_monthKey: { userId: user.id, monthKey: key } }
+  });
+
+  const used = row?.used ?? 0;
+  res.json({
+    plan: user?.plan || 'BASIC',
+    monthKey: key,
+    limit,
+    used,
+    remaining: Math.max(0, limit - used)
+  });
 });
 
 // UPDATE USER'S NAME

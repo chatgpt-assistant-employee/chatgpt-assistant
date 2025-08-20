@@ -38,6 +38,7 @@ model User {
   addOnSlots            Int         @default(0) // How many extra assistants they pay for
 
   assistants            Assistant[]
+  chatUsages            ChatUsage[]
 }
 
 model Assistant {
@@ -98,4 +99,18 @@ model EmailLog {
 
   assistantId     String
   assistant       Assistant @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+}
+
+// NEW — track per-user chat usage per calendar month
+model ChatUsage {
+  id        String   @id @default(cuid())
+  userId    String
+  monthKey  String   // e.g. "2025-08"
+  used      Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, monthKey])
 }
