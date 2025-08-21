@@ -45,16 +45,16 @@ function ChatPage() {
     const [usage, setUsage] = useState(null); // { plan, monthKey, limit, used, remaining }
 
     const activeAssistant = useMemo(
-    () => assistants.find(a => a.id === selectedAssistant),
-    [assistants, selectedAssistant]
+        () => assistants.find(a => a.id === selectedAssistant),
+        [assistants, selectedAssistant]
     );
 
     const assistantAvatar28 = useMemo(() => {
-    if (!activeAssistant?.avatarUrl) return null;
-    const fileName = activeAssistant.avatarUrl.split('/').pop() || '';
-    const ida = fileName.replace('.png', '');
-    const size = 28; // match the chat bubble avatar size
-    return `/avatars/${ida}-${size}.png`;
+        if (!activeAssistant?.avatarUrl) return null;
+        const fileName = activeAssistant.avatarUrl.split('/').pop() || '';
+        const ida = fileName.replace('.png', '');
+        const size = 28; // match the chat bubble avatar size
+        return `/avatars/${ida}-72.png`;
     }, [activeAssistant]);
 
     const scrollToBottom = () => {
@@ -340,7 +340,7 @@ function ChatPage() {
                 {isLoading && (
                     <Box sx={{ display: 'flex', gap: 1.5, mt: 1.5 }}>
                         {/* Assistant avatar to match your chat UI */}
-                        <Avatar src={assistantAvatar28} sx={{ width: 28, height: 28 }}>A</Avatar>
+                        <Avatar src={assistantAvatar28} sx={{ width: 38, height: 38, '& img': { objectFit: 'cover' } }}>A</Avatar>
 
                         {/* Bubble */}
                         <Box
