@@ -1,6 +1,6 @@
 // client/src/pages/ChatPage.jsx
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { 
     Box, 
     Paper, 
@@ -43,6 +43,19 @@ function ChatPage() {
     const [editingThreadId, setEditingThreadId] = useState(null);
     const [editingTitle, setEditingTitle] = useState('');
     const [usage, setUsage] = useState(null); // { plan, monthKey, limit, used, remaining }
+
+    const activeAssistant = useMemo(
+    () => assistants.find(a => a.id === selectedAssistant),
+    [assistants, selectedAssistant]
+    );
+
+    const assistantAvatar28 = useMemo(() => {
+    if (!activeAssistant?.avatarUrl) return null;
+    const fileName = activeAssistant.avatarUrl.split('/').pop() || '';
+    const ida = fileName.replace('.png', '');
+    const size = 28; // match the chat bubble avatar size
+    return `/avatars/${ida}-${size}.png`;
+    }, [activeAssistant]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
@@ -327,7 +340,7 @@ function ChatPage() {
                 {isLoading && (
                     <Box sx={{ display: 'flex', gap: 1.5, mt: 1.5 }}>
                         {/* Assistant avatar to match your chat UI */}
-                        <Avatar sx={{ width: 28, height: 28 }}>A</Avatar>
+                        <Avatar src={assistantAvatar28} sx={{ width: 28, height: 28 }}>A</Avatar>
 
                         {/* Bubble */}
                         <Box
