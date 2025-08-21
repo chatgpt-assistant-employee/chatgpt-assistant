@@ -21,10 +21,13 @@ import {
     IconButton,
     Avatar,
     Tooltip,
-    Alert
+    Alert,
+    Chip
 } from '@mui/material';
 import { Send as SendIcon, Add as AddIcon, ArrowBack as ArrowBackIcon, SmartToy as SmartToyIcon, Edit as EditIcon } from '@mui/icons-material';
 import AssistantPicker from '../components/AssistantPicker';
+import { keyframes } from '@emotion/react';
+import MoreHorizIcon from '@mui/icons-material/MoreHoriz'; // optional icon
 
 function ChatPage() {
     const [assistants, setAssistants] = useState([]);
@@ -44,6 +47,25 @@ function ChatPage() {
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
     };
+
+    const blink = keyframes`
+        0% { opacity: .2; transform: translateY(0); }
+        20% { opacity: 1; transform: translateY(-1px); }
+        100% { opacity: .2; transform: translateY(0); }
+    `;
+
+    function ThinkingDots({ label = 'Thinking' }) {
+        return (
+            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>{label}</Typography>
+            <Box sx={{ display: 'inline-flex', gap: 0.5 }}>
+                <Box component="span" sx={{ animation: `${blink} 1s infinite 0s` }}>•</Box>
+                <Box component="span" sx={{ animation: `${blink} 1s infinite 0.2s` }}>•</Box>
+                <Box component="span" sx={{ animation: `${blink} 1s infinite 0.4s` }}>•</Box>
+            </Box>
+            </Box>
+        );
+    }
 
     const fetchUsage = async () => {
         try {
@@ -239,6 +261,30 @@ function ChatPage() {
                     <Button startIcon={<ArrowBackIcon />} onClick={() => setView('history')}>Back to History</Button>
                 </Box>
             )}
+
+            {isLoading && (
+                <Box
+                    sx={{
+                    px: 2,
+                    py: 1,
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
+                    }}
+                >
+                    <Chip
+                    size="small"
+                    icon={<MoreHorizIcon fontSize="small" />}
+                    label="Generating"
+                    variant="outlined"
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                    Your assistant is composing a reply…
+                    </Typography>
+                </Box>
+            )}
             
             {/* --- THIS IS THE SCROLLABLE CHAT AREA --- */}
             <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column' }}>
@@ -278,7 +324,27 @@ function ChatPage() {
                         ))}
                     </>
                 )}
-                {isLoading && <Box sx={{display: 'flex', justifyContent: 'flex-start'}}><CircularProgress size={24} /></Box>}
+                {isLoading && (
+                    <Box sx={{ display: 'flex', gap: 1.5, mt: 1.5 }}>
+                        {/* Assistant avatar to match your chat UI */}
+                        <Avatar sx={{ width: 28, height: 28 }}>A</Avatar>
+
+                        {/* Bubble */}
+                        <Box
+                        sx={{
+                            px: 1.5,
+                            py: 1,
+                            borderRadius: 2,
+                            bgcolor: 'action.hover',
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            maxWidth: '75%'
+                        }}
+                        >
+                        <ThinkingDots label="Thinking" />
+                        </Box>
+                    </Box>
+                    )}
                 <div ref={messagesEndRef} />
             </Box>
 
