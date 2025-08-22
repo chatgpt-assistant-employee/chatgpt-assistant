@@ -419,6 +419,13 @@ const scopes = [
     'https://www.googleapis.com/auth/userinfo.profile',
 ];
 
+const createGoogleLoginClient = () =>
+  new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    `${process.env.APP_URL}/auth/google-login/callback`
+  );
+
 // This is a new middleware to protect routes from unverified users
 const isVerified = async (req, res, next) => {
     if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
@@ -519,6 +526,81 @@ cron.schedule('*/60 * * * *', checkAndSendFollowUps);
 // --- ROUTES ---
 
 // USER AUTH & SESSION ROUTES
+app.get('/auth/google-login', (req, res) => {
+  const oauth = createGoogleLoginClient();
+
+  // (Optional but recommended) CSRF state
+  const state = require('crypto').randomBytes(16).toString('hex');
+  req.session.oauthState = state;
+
+  const url = oauth.generateAuthUrl({
+    access_type: 'offline',
+    prompt: 'consent',                 // ask once; remove if you prefer silent
+    scope: ['openid', 'email', 'profile'],
+    state
+  });
+  res.redirect(url);
+});
+
+app.get('/auth/google-login/callback', async (req, res) => {
+  try {
+    const { code, state } = req.query;
+    if (!code) return res.status(400).send('Missing code');
+
+    // (Optional) validate state
+    if (!state || state !== req.session.oauthState) {
+      return res.status(400).send('Invalid state');
+    }
+
+    const oauth = createGoogleLoginClient();
+    const { tokens } = await oauth.getToken(code);
+
+    // Verify ID token and extract profile
+    const ticket = await oauth.verifyIdToken({
+      idToken: tokens.id_token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const { sub, email, email_verified, name, picture } = ticket.getPayload();
+
+    // Link or create user
+    let user = await prisma.user.findFirst({
+      where: { OR: [{ googleId: sub }, { email }] }
+    });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email,
+          googleId: sub,
+          name,
+          avatarUrl: picture,
+          isVerified: !!email_verified, // skip email verification gate
+        }
+      });
+    } else if (!user.googleId) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          googleId: sub,
+          // don’t downgrade isVerified if they were already verified
+          isVerified: user.isVerified || !!email_verified,
+          name: user.name ?? name,
+          avatarUrl: user.avatarUrl ?? picture,
+        }
+      });
+    }
+
+    // Same session you already use for email/password login
+    req.session.userId = user.id;
+
+    // Back to the SPA; the client will hit /api/me
+    res.redirect(`${process.env.FRONTEND_URL}/`);
+  } catch (e) {
+    console.error('Google login failed:', e);
+    res.redirect(`${process.env.FRONTEND_URL}/?login_error=google`);
+  }
+});
+
 app.get('/api/session', (req, res) => {
     if (req.session.userId) {
         res.status(200).json({ userId: req.session.userId });
