@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link as RouterLink } from 'react-router-dom';
 import { Box, Button, Paper, TextField, Typography, Link, CircularProgress } from '@mui/material';
+import GoogleIcon from '@mui/icons-material/Google';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -73,6 +74,21 @@ function AuthPage({ onLoginSuccess }) {
         </Typography>
         <Typography variant="body1" color="textSecondary" sx={{ mb: 4 }}>
           {isLoginView ? 'Please log in to access your dashboard.' : 'Get started with your AI assistant.'}
+        </Typography>
+        <Button
+          fullWidth
+          variant="outlined"
+          startIcon={<GoogleIcon />}
+          onClick={() => {
+            window.location.href = `${API_URL}/auth/google-login`;
+          }}
+          sx={{ mb: 2, py: 1.25 }}
+        >
+          Continue with Google
+        </Button>
+
+        <Typography variant="body2" sx={{ my: 1 }} color="text.secondary">
+          — or continue with email —
         </Typography>
         <Box component="form" onSubmit={handleAuth} noValidate>
           <TextField
