@@ -584,7 +584,7 @@ app.get('/auth/google-login/callback', async (req, res) => {
             email,
             googleId: sub,
             name,
-            avatarUrl: picture,
+            imageUrl: picture ?? undefined,
             isVerified: true, // Google verified the email
             // NOTE: passwordHash is intentionally omitted
           },
@@ -598,7 +598,7 @@ app.get('/auth/google-login/callback', async (req, res) => {
             googleId: sub,
             isVerified: byEmail.isVerified || true,
             name: byEmail.name ?? name,
-            avatarUrl: byEmail.avatarUrl ?? picture,
+            imageUrl: existingByEmail.imageUrl ?? picture ?? undefined,
             // passwordHash omitted on purpose
           },
         });
