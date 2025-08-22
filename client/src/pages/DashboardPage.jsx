@@ -23,7 +23,7 @@ import {
 } from '@mui/material';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend  } from 'recharts';
 import AssistantPicker from '../components/AssistantPicker';
-import { useUser } from './contexts/UserContext';
+import { useUser } from '../contexts/UserContext';
 import { Link } from 'react-router-dom';
 
 
