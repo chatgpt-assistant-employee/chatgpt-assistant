@@ -23,6 +23,8 @@ import {
 } from '@mui/material';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend  } from 'recharts';
 import AssistantPicker from '../components/AssistantPicker';
+import { useUser } from './contexts/UserContext';
+import { Link } from 'react-router-dom';
 
 
 // Enhanced StatCard component with better sizing and interactions
@@ -148,6 +150,8 @@ function DashboardPage() {
     const [trackingStats, setTrackingStats] = useState(null);
     const [modalOpen, setModalOpen] = useState(false);
     const [modalContent, setModalContent] = useState({ title: '', content: null });
+    const { user } = useUser();
+    const hasPlan = ['active', 'cancelled_grace_period'].includes(user?.subscriptionStatus);
 
     // All data fetching logic remains the same
     useEffect(() => {
@@ -344,11 +348,13 @@ if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
            <Box sx={{ mb: {sm: 2, lg: 5.7}, mt: {lg: 3}, textAlign: 'center', display: 'flex', flexDirection: 'column',justifyContent: 'center', position: { sm: 'relative', lg: 'relative'} }}>
                 <Typography variant="h3" fontWeight="bold" sx={{  mb: 1, background: '#7cdff8e3', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Dashboard</Typography>
                 <Box sx={{ position: { lg: 'absolute' }, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <AssistantPicker
-                        assistants={assistants}
-                        value={selectedAssistant}
-                        onChange={setSelectedAssistant}
-                    />
+                    {assistants.length > 0 && (
+                        <AssistantPicker
+                            assistants={assistants}
+                            value={selectedAssistant}
+                            onChange={setSelectedAssistant}
+                        />
+                    )}
                 </Box>
             </Box>
 
@@ -358,7 +364,25 @@ if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
                 </Box>
             ) : !selectedAssistant ? (
                 <Paper sx={{ p: 4, textAlign: 'center' }}>
-                    <Typography>Create an assistant to see its stats.</Typography>
+                    {hasPlan ? (
+                        <>
+                        <Typography variant="h6" gutterBottom>
+                            To view analytics, add your first assistant.
+                        </Typography>
+                        <Button component={Link} to="/assistants" variant="contained" sx={{ mt: 2 }}>
+                            Create an Assistant
+                        </Button>
+                        </>
+                    ) : (
+                        <>
+                        <Typography variant="h6" gutterBottom>
+                            To view analytics, you’ll need to add an assistant — but first, choose a plan.
+                        </Typography>
+                        <Button component={Link} to="/billing" variant="contained" sx={{ mt: 2 }}>
+                            Go to Billing
+                        </Button>
+                        </>
+                    )}
                 </Paper>
             ) : (
                 <Grid container spacing={4} sx={{ minHeight: '80vh' }}>
