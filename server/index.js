@@ -546,8 +546,6 @@ app.get('/auth/google-login/callback', async (req, res) => {
   try {
     const { code, state } = req.query;
     if (!code) return res.status(400).send('Missing code');
-
-    // (Optional) validate state
     if (!state || state !== req.session.oauthState) {
       return res.status(400).send('Invalid state');
     }
@@ -555,45 +553,60 @@ app.get('/auth/google-login/callback', async (req, res) => {
     const oauth = createGoogleLoginClient();
     const { tokens } = await oauth.getToken(code);
 
-    // Verify ID token and extract profile
     const ticket = await oauth.verifyIdToken({
       idToken: tokens.id_token,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
-    const { sub, email, email_verified, name, picture } = ticket.getPayload();
 
-    // Link or create user
-    let user = await prisma.user.findFirst({
-      where: { OR: [{ googleId: sub }, { email }] }
-    });
+    const payload = ticket.getPayload();
+    const sub = payload.sub; // Google user id
+    const email = payload.email;
+    const email_verified = !!payload.email_verified;
+    const name = payload.name || null;
+    const picture = payload.picture || null;
 
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email,
-          googleId: sub,
-          name,
-          avatarUrl: picture,
-          isVerified: !!email_verified, // skip email verification gate
-        }
-      });
-    } else if (!user.googleId) {
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          googleId: sub,
-          // don’t downgrade isVerified if they were already verified
-          isVerified: user.isVerified || !!email_verified,
-          name: user.name ?? name,
-          avatarUrl: user.avatarUrl ?? picture,
-        }
-      });
+    if (!email || !email_verified) {
+      // Don’t link by email unless Google says it’s verified
+      return res.redirect(`${process.env.FRONTEND_URL}/?login_error=unverified_email`);
     }
 
-    // Same session you already use for email/password login
-    req.session.userId = user.id;
+    // 1) If there’s already a user with this googleId, use it.
+    let user = await prisma.user.findUnique({ where: { googleId: sub } });
 
-    // Back to the SPA; the client will hit /api/me
+    if (!user) {
+      // 2) Otherwise look up by email to link accounts
+      const byEmail = await prisma.user.findUnique({ where: { email } });
+
+      if (!byEmail) {
+        // 3) Create a new Google-only user
+        user = await prisma.user.create({
+          data: {
+            email,
+            googleId: sub,
+            name,
+            avatarUrl: picture,
+            isVerified: true, // Google verified the email
+            // NOTE: passwordHash is intentionally omitted
+          },
+        });
+      } else {
+        // 4) Link Google to existing account.
+        // IMPORTANT: do NOT include passwordHash; we keep whatever it had.
+        user = await prisma.user.update({
+          where: { id: byEmail.id },
+          data: {
+            googleId: sub,
+            isVerified: byEmail.isVerified || true,
+            name: byEmail.name ?? name,
+            avatarUrl: byEmail.avatarUrl ?? picture,
+            // passwordHash omitted on purpose
+          },
+        });
+      }
+    }
+
+    // Log in via your existing session
+    req.session.userId = user.id;
     res.redirect(`${process.env.FRONTEND_URL}/`);
   } catch (e) {
     console.error('Google login failed:', e);

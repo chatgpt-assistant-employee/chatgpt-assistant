@@ -12,7 +12,7 @@ datasource db {
 model User {
   id                    String      @id @default(cuid())
   email                 String      @unique
-  passwordHash          String
+  passwordHash          String?   // nullable so Google-only accounts are OK
   googleId              String?  @unique
   name                  String?
   imageUrl              String?
