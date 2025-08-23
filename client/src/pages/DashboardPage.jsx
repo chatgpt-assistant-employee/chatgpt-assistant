@@ -120,7 +120,12 @@ const DetailModal = ({ open, onClose, title, content }) => (
         maxWidth="md" 
         fullWidth
         PaperProps={{
-            sx: { borderRadius: 3 }
+            sx: {
+                borderRadius: 3,
+                bgcolor: 'background.mPaper',   // solid background
+                backgroundImage: 'none',       // remove gradient/overlay
+                boxShadow: 6                   // optional, gives a clean popup look
+            }
         }}
     >
         <DialogTitle sx={{ pb: 1 }}>
