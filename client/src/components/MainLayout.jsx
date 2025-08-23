@@ -69,7 +69,7 @@ function MainLayout() {
   // Define the drawer styles once to be reused
   const drawerPaperStyles = {
     width: drawerWidth,
-    bgcolor: 'background.paper',
+    bgcolor: {xs: 'background.mPaper', sm: 'background.paper', lg: 'background.paper'},
     boxSizing: 'border-box',
     border: '1px solid #7cf4f886',
     borderRadius: 4,

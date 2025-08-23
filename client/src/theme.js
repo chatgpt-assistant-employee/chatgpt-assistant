@@ -67,7 +67,8 @@ export const getDesignTokens = (mode) => ({
           background: {
             default: '#0c1319a4', // A standard, deep charcoal for the background
             paper: '#0a111756',   // A slightly lighter gray for cards and surfaces
-            tick: '#7cf4f8'
+            tick: '#7cf4f8',
+            mPaper: '#0a1117ff',
           },
           text: {
             primary: '#d3ceceff',   // Soft off-white for primary text (easy on the eyes)
