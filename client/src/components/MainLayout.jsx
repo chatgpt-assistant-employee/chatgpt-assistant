@@ -74,10 +74,11 @@ function MainLayout() {
     border: '1px solid #7cf4f886',
     borderRadius: 4,
     m: { xs: 1, sm: 2 }, // Different margins for mobile vs desktop
-    height: { xs: 'calc(100vh - 16px)', sm: 'calc(100vh - 32px)' },
+    height: { xs: '100dvh', sm: 'calc(100vh - 32px)' },
     
     display: 'flex',
     flexDirection: 'column',
+    overflow: 'hidden',
   };
 
   const drawerContent = (
@@ -139,6 +140,14 @@ function MainLayout() {
             aria-label="open drawer"
             edge="start"
             onClick={handleDrawerToggle}
+            disableRipple
+            disableFocusRipple
+            sx={{
+              outline: 'none',
+              '&:focus': { outline: 'none' },
+              '&:focus-visible': { outline: 'none' },
+              '& .MuiTouchRipple-root': { display: 'none' },
+            }}
           >
             <MenuIcon />
           </IconButton>
