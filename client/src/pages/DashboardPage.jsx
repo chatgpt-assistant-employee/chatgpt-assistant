@@ -122,7 +122,7 @@ const DetailModal = ({ open, onClose, title, content }) => (
         PaperProps={{
             sx: {
                 borderRadius: 3,
-                bgcolor: 'background.mPaper',   // solid background
+                bgcolor: '#26288fff',   // solid background
                 backgroundImage: 'none',       // remove gradient/overlay
                 boxShadow: 6                   // optional, gives a clean popup look
             }
@@ -423,33 +423,20 @@ if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
                             title="Replies Sent" 
                             onClick={() => handleCardClick('total')} 
                         >
-                            <Box>
-                                {isFilterLoading ? (
-                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100px' }}>
-                                        <CircularProgress />
-                                    </Box>
-                                ) : (
-                                    <Typography 
-                                        component="p" 
-                                        variant="h4" 
-                                        fontWeight="bold"
-                                        sx={{ 
-                                            fontSize: { xs: '2.5rem', sm: '3rem' },
-                                            color: 'primary.main',
-                                            mb: 2,
-                                            textShadow: '0 0 8px rgba(124,244,248,.45)'
-                                        }}
-                                    >
-                                        {filteredRepliesCount}
-                                    </Typography>
-                                )}
-                            </Box>
-                             <FormControl variant="standard" size="small" sx={{ minWidth: 120, alignSelf: 'flex-start' }}>
+                            {/* --- CHANGE 1, 2 & 3: Reposition and fix the filter --- */}
+                            <FormControl 
+                                variant="standard" 
+                                size="small" 
+                                sx={{ position: 'absolute', top: 24, right: 24, minWidth: 120, zIndex: 10 }}
+                                onClick={(e) => e.stopPropagation()} // Stop click from opening the modal
+                            >
                                 <Select
                                     labelId="time-filter-label"
                                     id="time-filter-select"
                                     value={timeFilter}
                                     onChange={(e) => setTimeFilter(e.target.value)}
+                                    // Make the dropdown menu solid
+                                    MenuProps={{ PaperProps: { sx: { bgcolor: 'background.paper', backgroundImage: 'none' }}}}
                                 >
                                     <MenuItem value="today">Today</MenuItem>
                                     <MenuItem value="week">Last 7 Days</MenuItem>
@@ -460,6 +447,26 @@ if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
                                     <MenuItem value="all">All Time</MenuItem>
                                 </Select>
                             </FormControl>
+
+                            {/* The count display, centered */}
+                            <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {isFilterLoading ? (
+                                    <CircularProgress />
+                                ) : (
+                                    <Typography 
+                                        component="p" 
+                                        variant="h4" 
+                                        fontWeight="bold"
+                                        sx={{ 
+                                            fontSize: { xs: '2.5rem', sm: '3rem' },
+                                            color: 'primary.main',
+                                            textShadow: '0 0 8px rgba(124,244,248,.45)'
+                                        }}
+                                    >
+                                        {filteredRepliesCount}
+                                    </Typography>
+                                )}
+                            </Box>
                         </StatCard>
                     </Grid>
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>
