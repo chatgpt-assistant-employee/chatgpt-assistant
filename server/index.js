@@ -3151,6 +3151,52 @@ app.get('/api/stats/:assistantId', isVerified, async (req, res) => {
         const assistant = await prisma.assistant.findFirst({ where: { id: assistantId, userId: req.session.userId } });
         if (!assistant) return res.status(403).json({ message: 'Permission denied.' });
 
+        // --- NEW LOGIC: Handle filtered requests for a single count ---
+        if (period) {
+            let startDate;
+            const now = new Date();
+
+            switch (period) {
+                case 'today':
+                    startDate = new Date(now.setHours(0, 0, 0, 0));
+                    break;
+                case 'week':
+                    startDate = new Date();
+                    startDate.setDate(now.getDate() - 7);
+                    break;
+                case '4weeks':
+                    startDate = new Date();
+                    startDate.setDate(now.getDate() - 28);
+                    break;
+                case '3months':
+                    startDate = new Date();
+                    startDate.setMonth(now.getMonth() - 3);
+                    break;
+                case '6months':
+                    startDate = new Date();
+                    startDate.setMonth(now.getMonth() - 6);
+                    break;
+                case 'year':
+                    startDate = new Date();
+                    startDate.setFullYear(now.getFullYear() - 1);
+                    break;
+                case 'all':
+                    // No start date needed for 'all time'
+                    break;
+                default:
+                    return res.status(400).json({ message: 'Invalid time period specified.' });
+            }
+
+            const whereClause = { assistantId };
+            if (period !== 'all') {
+                whereClause.createdAt = { gte: startDate };
+            }
+
+            const count = await prisma.emailLog.count({ where: whereClause });
+            return res.json({ count });
+        }
+        // --- END OF NEW LOGIC ---
+
         const now = new Date();
         const todayStart = new Date(now.setHours(0, 0, 0, 0));
         

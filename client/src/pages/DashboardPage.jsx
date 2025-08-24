@@ -157,6 +157,9 @@ function DashboardPage() {
     const [modalContent, setModalContent] = useState({ title: '', content: null });
     const { user } = useUser();
     const hasPlan = ['active', 'cancelled_grace_period'].includes(user?.subscriptionStatus);
+    const [timeFilter, setTimeFilter] = useState('today');
+    const [filteredRepliesCount, setFilteredRepliesCount] = useState(0);
+    const [isFilterLoading, setIsFilterLoading] = useState(false);
 
     // All data fetching logic remains the same
     useEffect(() => {
@@ -206,6 +209,29 @@ if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
         };
         fetchDashboardData();
     }, [selectedAssistant]);
+
+    // --- NEW EFFECT TO FETCH DATA FOR THE FILTERED CARD ---
+    useEffect(() => {
+        if (!selectedAssistant) return;
+
+        const fetchFilteredReplies = async () => {
+            setIsFilterLoading(true);
+            try {
+                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stats/${selectedAssistant}?period=${timeFilter}`, { credentials: 'include' });
+                if (response.ok) {
+                    const data = await response.json();
+                    setFilteredRepliesCount(data.count);
+                }
+            } catch (error) {
+                console.error("Failed to fetch filtered replies:", error);
+                setFilteredRepliesCount(0); // Reset on error
+            } finally {
+                setIsFilterLoading(false);
+            }
+        };
+
+        fetchFilteredReplies();
+    }, [selectedAssistant, timeFilter]);
 
     const emailTrackingData = [
         { name: 'Opened', value: trackingStats?.totalOpened ?? 0 },
@@ -394,11 +420,47 @@ if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
                     {/* Top Row - 3 cards */}
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>
                         <StatCard 
-                            title="Total Replies Sent" 
-                            value={stats?.totalEmailsHandled ?? 0} 
-                            description="Since assistant creation" 
+                            title="Replies Sent" 
                             onClick={() => handleCardClick('total')} 
-                        />
+                        >
+                            <Box>
+                                {isFilterLoading ? (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100px' }}>
+                                        <CircularProgress />
+                                    </Box>
+                                ) : (
+                                    <Typography 
+                                        component="p" 
+                                        variant="h4" 
+                                        fontWeight="bold"
+                                        sx={{ 
+                                            fontSize: { xs: '2.5rem', sm: '3rem' },
+                                            color: 'primary.main',
+                                            mb: 2,
+                                            textShadow: '0 0 8px rgba(124,244,248,.45)'
+                                        }}
+                                    >
+                                        {filteredRepliesCount}
+                                    </Typography>
+                                )}
+                            </Box>
+                             <FormControl variant="standard" size="small" sx={{ minWidth: 120, alignSelf: 'flex-start' }}>
+                                <Select
+                                    labelId="time-filter-label"
+                                    id="time-filter-select"
+                                    value={timeFilter}
+                                    onChange={(e) => setTimeFilter(e.target.value)}
+                                >
+                                    <MenuItem value="today">Today</MenuItem>
+                                    <MenuItem value="week">Last 7 Days</MenuItem>
+                                    <MenuItem value="4weeks">Last 4 Weeks</MenuItem>
+                                    <MenuItem value="3months">Last 3 Months</MenuItem>
+                                    <MenuItem value="6months">Last 6 Months</MenuItem>
+                                    <MenuItem value="year">Last Year</MenuItem>
+                                    <MenuItem value="all">All Time</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </StatCard>
                     </Grid>
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>
                         <StatCard 
