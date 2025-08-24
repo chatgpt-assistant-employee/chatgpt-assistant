@@ -275,6 +275,28 @@ function ChatPage() {
                 </Box>
             )}
 
+            {/* Back to assistants picker */}
+            <Box
+                sx={{
+                    px: 2,
+                    py: 1,
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                }}
+                >
+                <Button
+                    startIcon={<ArrowBackIcon />}
+                    onClick={() => setSelectedAssistant('')}
+                    size="small"
+                    variant="outlined"
+                >
+                    Back to Assistants
+                </Button>
+            </Box>
+
             {isLoading && (
                 <Box
                     sx={{
@@ -317,24 +339,73 @@ function ChatPage() {
                 ) : (
                     // Otherwise, show the messages
                     <>
-                        {currentThread.messages.map((msg, index) => (
-                            <Box key={index} sx={{ mb: 2, display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                        {currentThread.messages.map((msg, index) => {
+                        if (msg.role === 'user') {
+                            // USER MESSAGE (right-aligned bubble)
+                            return (
+                            <Box key={index} sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
                                 <Paper
-                                    elevation={1}
-                                    sx={{
-                                        p: 1.5,
-                                        borderRadius: 2,
-                                        maxWidth: '80%',
-                                        bgcolor: msg.role === 'user' ? 'primary.main' : 'background.paper',
-                                        color: msg.role === 'user' ? 'primary.contrastText' : 'text.primary',
-                                    }}
+                                elevation={1}
+                                sx={{
+                                    p: 1.5,
+                                    borderRadius: 2,
+                                    maxWidth: '80%',
+                                    bgcolor: 'primary.main',
+                                    color: 'primary.contrastText',
+                                }}
                                 >
-                                    <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                                        {msg.content}
-                                    </Typography>
+                                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                    {msg.content}
+                                </Typography>
                                 </Paper>
                             </Box>
-                        ))}
+                            );
+                        }
+
+                        // ASSISTANT MESSAGE (left-aligned, with avatar)
+                        return (
+                            <Box key={index} sx={{ mb: 2, display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+                            <Avatar
+                                src={assistantAvatar28}
+                                sx={{
+                                width: 48,
+                                height: 48,
+                                border: '2px solid #7cf4f8',
+                                cursor: 'default',
+                                clipPath: 'inset(-4px 0 0 0 round 50%)', // mini version of your gallery trick
+                                position: 'relative',
+                                overflow: 'visible',
+                                '& img': {
+                                    position: 'relative',
+                                    top: '-2px',             // lift up a bit
+                                    width: 'calc(100% + 8px)',
+                                    height: 'auto',
+                                    minHeight: '100%',
+                                    objectFit: 'cover',
+                                    clipPath: 'inset(-4px 0 0 0 round 50%)',
+                                }
+                                }}
+                            >
+                                A
+                            </Avatar>
+
+                            <Paper
+                                elevation={1}
+                                sx={{
+                                p: 1.5,
+                                borderRadius: 2,
+                                maxWidth: '80%',
+                                bgcolor: 'background.paper',
+                                color: 'text.primary',
+                                }}
+                            >
+                                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                {msg.content}
+                                </Typography>
+                            </Paper>
+                            </Box>
+                        );
+                        })}
                     </>
                 )}
                 {isLoading && (
@@ -354,7 +425,7 @@ function ChatPage() {
                             maxWidth: '75%'
                         }}
                         >
-                        <ThinkingDots label="Thinking" />
+                        <ThinkingDots label="Answering" />
                         </Box>
                     </Box>
                     )}
