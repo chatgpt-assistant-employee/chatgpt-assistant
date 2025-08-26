@@ -354,6 +354,7 @@ const DetailModal = ({ open, onClose, title, content }) => (
             sx: {
                 borderRadius: 3,
                 bgcolor: '#494963ff',
+                color: '#7cdff8e3',
                 backgroundImage: 'none',
                 boxShadow: 6,
                 maxHeight: '90vh'
