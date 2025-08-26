@@ -2849,39 +2849,97 @@ app.get('/api/stats/tracking/:assistantId', isVerified, async (req, res) => {
 
     try {
         const { assistantId } = req.params;
-        const assistant = await prisma.assistant.findFirst({ where: { id: assistantId, userId: req.session.userId }});
+        const { period } = req.query; // Get the period filter
+        
+        const assistant = await prisma.assistant.findFirst({ 
+            where: { id: assistantId, userId: req.session.userId }
+        });
         if (!assistant) return res.status(403).json({ message: 'Permission denied.' });
 
-        // --- NEW: More detailed queries ---
+        // Determine the date range based on period
+        let startDate;
         const now = new Date();
-        const todayStart = new Date(now.setHours(0, 0, 0, 0));
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-        const totalSent = await prisma.emailLog.count({
-            where: { assistantId: assistantId, action: 'REPLY_SENT' },
-        });
-
-        const totalOpened = await prisma.emailLog.count({
-            where: { assistantId: assistantId, status: 'opened' },
-        });
-
-        const openedToday = await prisma.emailLog.count({
-            where: { assistantId: assistantId, status: 'opened', createdAt: { gte: todayStart } },
-        });
         
-        const openedLast7Days = await prisma.emailLog.count({
-            where: { assistantId: assistantId, status: 'opened', createdAt: { gte: sevenDaysAgo } },
+        switch (period) {
+            case 'today':
+                startDate = new Date(now.setHours(0, 0, 0, 0));
+                break;
+            case 'week':
+                startDate = new Date();
+                startDate.setDate(now.getDate() - 7);
+                break;
+            case 'month':
+                startDate = new Date();
+                startDate.setMonth(now.getMonth() - 1);
+                break;
+            case '3months':
+                startDate = new Date();
+                startDate.setMonth(now.getMonth() - 3);
+                break;
+            case '6months':
+                startDate = new Date();
+                startDate.setMonth(now.getMonth() - 6);
+                break;
+            case 'year':
+                startDate = new Date();
+                startDate.setFullYear(now.getFullYear() - 1);
+                break;
+            case 'all':
+            default:
+                startDate = null; // No date filter for 'all time'
+                break;
+        }
+
+        // Build where clause with date filter
+        const whereClause = { 
+            assistantId: assistantId, 
+            action: 'REPLY_SENT'
+        };
+        
+        if (startDate) {
+            whereClause.createdAt = { gte: startDate };
+        }
+
+        // Get total sent emails for the period
+        const totalSent = await prisma.emailLog.count({
+            where: whereClause
         });
 
-        const openRate = totalSent > 0 ? (totalOpened / totalSent) * 100 : 0;
+        // Get total opened emails for the period
+        const totalOpened = await prisma.emailLog.count({
+            where: {
+                ...whereClause,
+                status: 'opened'
+            }
+        });
+
+        // Get regular opened (non-follow-up emails that were opened)
+        const regularOpened = await prisma.emailLog.count({
+            where: {
+                ...whereClause,
+                status: 'opened',
+                followUpRequired: false
+            }
+        });
+
+        // Get follow-ups opened (follow-up emails that were opened)
+        const followUpsOpened = await prisma.emailLog.count({
+            where: {
+                ...whereClause,
+                status: 'opened',
+                followUpRequired: true
+            }
+        });
+
+        // Calculate open rate
+        const openRate = totalSent > 0 ? ((totalOpened / totalSent) * 100).toFixed(1) : 0;
 
         res.json({
             totalSent,
             totalOpened,
-            openedToday,
-            openedLast7Days,
-            openRate: openRate.toFixed(1),
+            regularOpened,
+            followUpsOpened,
+            openRate: parseFloat(openRate)
         });
 
     } catch (error) {

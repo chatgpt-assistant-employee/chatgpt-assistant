@@ -8,7 +8,6 @@ import {
     ListItem,
     ListItemText,
     FormControl, 
-    InputLabel, 
     Select, 
     MenuItem, 
     CircularProgress, 
@@ -19,15 +18,106 @@ import {
     DialogActions,
     Button,
     Divider,
-    Avatar
+    TableContainer,
+    Table,
+    TableHead,
+    TableRow,
+    TableCell,
+    TableBody,
+    IconButton,
+    Collapse,
+    Tooltip
 } from '@mui/material';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend  } from 'recharts';
+import { 
+    KeyboardArrowDown as KeyboardArrowDownIcon, 
+    KeyboardArrowUp as KeyboardArrowUpIcon,
+    Check as CheckIcon,
+    FiberManualRecord as UnreadIcon,
+    Refresh as RefreshIcon
+} from '@mui/icons-material';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import AssistantPicker from '../components/AssistantPicker';
 import { useUser } from '../contexts/UserContext';
 import { Link } from 'react-router-dom';
 
+// Mini conversation row for dashboard
+function ConversationRowMini({ row, assistantId }) {
+    const [open, setOpen] = useState(false);
+    const [details, setDetails] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
 
-// Enhanced StatCard component with better sizing and interactions
+    const fetchThreadDetails = async () => {
+        if (open) {
+            setOpen(false);
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const response = await fetch(
+              `${import.meta.env.VITE_API_URL}/api/thread/${assistantId}/${row.id}`,
+              { credentials: 'include' }
+            );
+            if (response.ok) {
+                const data = await response.json();
+                setDetails(data);
+                setOpen(true);
+            }
+        } catch (error) {
+            console.error("Failed to fetch thread details:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <>
+            <TableRow sx={{ '& > *': { borderBottom: 'unset' } }}>
+                <TableCell>
+                    <IconButton aria-label="expand row" size="small" onClick={fetchThreadDetails}>
+                        {isLoading ? <CircularProgress size={20} /> : (open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />)}
+                    </IconButton>
+                </TableCell>
+                <TableCell component="th" scope="row">{row.from}</TableCell>
+                <TableCell>{row.subject}</TableCell>
+                <TableCell>{row.snippet}</TableCell>
+                <TableCell align="right" sx={{width: '60px'}}>
+                    {row.status === 'unread' && (
+                        <Tooltip title="Unread">
+                            <UnreadIcon color="primary" sx={{ fontSize: '14px' }} />
+                        </Tooltip>
+                    )}
+                    {row.status === 'opened' && (
+                        <Tooltip title="Opened">
+                            <CheckIcon color="success" sx={{ fontSize: '18px' }} />
+                        </Tooltip>
+                    )}
+                </TableCell>
+            </TableRow>
+            <TableRow>
+                <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={5}>
+                    <Collapse in={open} timeout="auto" unmountOnExit>
+                        <Box sx={{ margin: 1, p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
+                            <Typography variant="h6" gutterBottom component="div">Conversation History</Typography>
+                            {details.map((message) => (
+                                <Paper key={message.id} variant="outlined" sx={{ p: 2, mb: 2 }}>
+                                    <Typography variant="subtitle2" component="div">
+                                        <strong>From:</strong> {message.from}
+                                    </Typography>
+                                    <Divider sx={{ my: 1 }} />
+                                    <Typography component="div" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '0.9rem', wordBreak: 'break-all' }}>
+                                        {message.body}
+                                    </Typography>
+                                </Paper>
+                            ))}
+                        </Box>
+                    </Collapse>
+                </TableCell>
+            </TableRow>
+        </>
+    );
+}
+
+// StatCard component
 const StatCard = ({ title, value, description, children, onClick, titleColor = 'primary.main', descColor = 'text.secondary' }) => (
     <ButtonBase
         onClick={onClick}
@@ -67,14 +157,13 @@ const StatCard = ({ title, value, description, children, onClick, titleColor = '
             <Typography 
                 component="h2" 
                 variant="h6" 
-                //color="text.secondary" 
                 gutterBottom
                 sx={{ 
                     fontSize: { xs: '1.1rem', sm: '1.25rem' },
                     fontWeight: 600,
                     mb: 2,
                     color: titleColor,
-                    textShadow: '0 0 8px rgba(124,244,248,.45)' // optional glow
+                    textShadow: '0 0 8px rgba(124,244,248,.45)'
                 }}
             >
                 {title}
@@ -112,7 +201,7 @@ const StatCard = ({ title, value, description, children, onClick, titleColor = '
     </ButtonBase>
 );
 
-// Modal component for detailed views
+// Modal component
 const DetailModal = ({ open, onClose, title, content }) => (
     <Dialog 
         open={open} 
@@ -122,9 +211,9 @@ const DetailModal = ({ open, onClose, title, content }) => (
         PaperProps={{
             sx: {
                 borderRadius: 3,
-                bgcolor: '#26288fff',   // solid background
-                backgroundImage: 'none',       // remove gradient/overlay
-                boxShadow: 6                   // optional, gives a clean popup look
+                bgcolor: '#26288fff',
+                backgroundImage: 'none',
+                boxShadow: 6
             }
         }}
     >
@@ -160,35 +249,38 @@ function DashboardPage() {
     const [timeFilter, setTimeFilter] = useState('today');
     const [filteredRepliesCount, setFilteredRepliesCount] = useState(0);
     const [isFilterLoading, setIsFilterLoading] = useState(false);
+    
+    // New states for email tracking
+    const [trackingTimeFilter, setTrackingTimeFilter] = useState('all');
+    const [filteredTrackingStats, setFilteredTrackingStats] = useState(null);
+    const [isTrackingFilterLoading, setIsTrackingFilterLoading] = useState(false);
+    const [threads, setThreads] = useState([]);
+    const [isThreadsLoading, setIsThreadsLoading] = useState(false);
 
-    // All data fetching logic remains the same
+    // Fetch assistants
     useEffect(() => {
         const fetchAssistants = async () => {
             try {
                 const response = await fetch(`${import.meta.env.VITE_API_URL}/api/assistants`, { credentials: 'include' });
                 if (response.ok) {
                     const data = await response.json();
-                    const fallbackAvatars = [
-  '/avatars/avatar1.png',
-  '/avatars/avatar2.png',
-  '/avatars/avatar3.png',
-  '/avatars/avatar4.png'
-];
-
-const withPics = data.map((a, i) => ({
-  ...a,
-  avatarUrl: a.avatarUrl || fallbackAvatars[i % fallbackAvatars.length]
-}));
-
-setAssistants(withPics);
-if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
+                    const fallbackAvatars = ['/avatars/avatar1.png', '/avatars/avatar2.png', '/avatars/avatar3.png', '/avatars/avatar4.png'];
+                    const withPics = data.map((a, i) => ({
+                        ...a,
+                        avatarUrl: a.avatarUrl || fallbackAvatars[i % fallbackAvatars.length]
+                    }));
+                    setAssistants(withPics);
+                    if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
                     else setIsLoading(false);
                 }
-            } catch (error) { setIsLoading(false); }
+            } catch (error) { 
+                setIsLoading(false); 
+            }
         };
         fetchAssistants();
     }, []);
 
+    // Fetch dashboard data
     useEffect(() => {
         if (!selectedAssistant) return;
         const fetchDashboardData = async () => {
@@ -203,17 +295,23 @@ if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
                 if (statsRes.ok) setStats(await statsRes.json());
                 if (dailyChartRes.ok) setDailyChartData(await dailyChartRes.json());
                 if (hourlyChartRes.ok) setHourlyChartData(await hourlyChartRes.json());
-                if (trackingRes.ok) setTrackingStats(await trackingRes.json());
-            } catch (error) { console.error("Failed to fetch dashboard data:", error); } 
-            finally { setIsLoading(false); }
+                if (trackingRes.ok) {
+                    const data = await trackingRes.json();
+                    setTrackingStats(data);
+                    setFilteredTrackingStats(data);
+                }
+            } catch (error) { 
+                console.error("Failed to fetch dashboard data:", error); 
+            } finally { 
+                setIsLoading(false); 
+            }
         };
         fetchDashboardData();
     }, [selectedAssistant]);
 
-    // --- NEW EFFECT TO FETCH DATA FOR THE FILTERED CARD ---
+    // Fetch filtered replies
     useEffect(() => {
         if (!selectedAssistant) return;
-
         const fetchFilteredReplies = async () => {
             setIsFilterLoading(true);
             try {
@@ -224,24 +322,57 @@ if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
                 }
             } catch (error) {
                 console.error("Failed to fetch filtered replies:", error);
-                setFilteredRepliesCount(0); // Reset on error
+                setFilteredRepliesCount(0);
             } finally {
                 setIsFilterLoading(false);
             }
         };
-
         fetchFilteredReplies();
     }, [selectedAssistant, timeFilter]);
 
+    // Fetch filtered tracking stats
+    useEffect(() => {
+        if (!selectedAssistant) return;
+        const fetchFilteredTrackingStats = async () => {
+            setIsTrackingFilterLoading(true);
+            try {
+                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stats/tracking/${selectedAssistant}?period=${trackingTimeFilter}`, { credentials: 'include' });
+                if (response.ok) {
+                    const data = await response.json();
+                    setFilteredTrackingStats(data);
+                }
+            } catch (error) {
+                console.error("Failed to fetch filtered tracking stats:", error);
+            } finally {
+                setIsTrackingFilterLoading(false);
+            }
+        };
+        fetchFilteredTrackingStats();
+    }, [selectedAssistant, trackingTimeFilter]);
+
+    // Fetch threads
+    const fetchThreads = async () => {
+        if (!selectedAssistant) return;
+        setIsThreadsLoading(true);
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/threads/${selectedAssistant}`, { credentials: 'include' });
+            if (res.ok) setThreads(await res.json());
+        } catch (e) {
+            console.error("Failed to fetch threads:", e);
+        } finally {
+            setIsThreadsLoading(false);
+        }
+    };
+
     const emailTrackingData = [
-        { name: 'Opened', value: trackingStats?.totalOpened ?? 0 },
-        { name: 'Unopened', value: (trackingStats?.totalSent ?? 0) - (trackingStats?.totalOpened ?? 0) },
+        { name: 'Opened', value: filteredTrackingStats?.totalOpened ?? 0 },
+        { name: 'Unopened', value: (filteredTrackingStats?.totalSent ?? 0) - (filteredTrackingStats?.totalOpened ?? 0) },
     ];
 
     const COLORS = ['#7e57c2', '#e0e0e0'];
 
-    // Modal handlers for each card
-    const handleCardClick = (cardType) => {
+    // Modal handlers
+    const handleCardClick = async (cardType) => {
         let title = '';
         let content = null;
 
@@ -253,12 +384,6 @@ if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
                         <Typography variant="h4" gutterBottom>{stats?.totalEmailsHandled ?? 0}</Typography>
                         <Typography variant="body1" color="text.secondary" paragraph>
                             This represents the total number of email replies your assistant has sent since it was created.
-                        </Typography>
-                        <Typography variant="body2">
-                            • Average replies per day: {stats?.totalEmailsHandled ? Math.round(stats.totalEmailsHandled / 30) : 0}
-                        </Typography>
-                        <Typography variant="body2">
-                            • Performance trend: {stats?.totalEmailsHandled > 50 ? 'High activity' : 'Getting started'}
                         </Typography>
                     </Box>
                 );
@@ -293,36 +418,48 @@ if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
                         <Typography variant="body1" color="text.secondary" paragraph>
                             Email replies sent since midnight today
                         </Typography>
-                        <Typography variant="body2">
-                            • Current time: {new Date().toLocaleTimeString()}
-                        </Typography>
-                        <Typography variant="body2">
-                            • Status: {stats?.emailsToday > 0 ? 'Active today' : 'No activity yet today'}
-                        </Typography>
                     </Box>
                 );
                 break;
             case 'engagement':
-                title = 'Email Engagement Details';
+                await fetchThreads();
+                title = 'Conversation Inbox';
                 content = (
                     <Box>
-                        <Typography variant="body1" color="text.secondary" paragraph>
-                            This chart shows the ratio of sent emails that were opened by recipients.
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" paragraph>
-                            Note: Due to privacy features in some email clients, open tracking is an estimate and may not be 100% accurate.
-                        </Typography>
-                        <Box sx={{ mt: 2, height: 300, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                             <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie data={emailTrackingData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" paddingAngle={5} label>
-                                        {emailTrackingData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
-                                    </Pie>
-                                    <Tooltip />
-                                    <Legend />
-                                </PieChart>
-                            </ResponsiveContainer>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                            <Typography variant="body1" color="text.secondary">
+                                Recent conversations and their status
+                            </Typography>
+                            <Button variant="outlined" size="small" startIcon={<RefreshIcon />} onClick={fetchThreads}>
+                                Refresh
+                            </Button>
                         </Box>
+                        {isThreadsLoading ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                                <CircularProgress />
+                            </Box>
+                        ) : threads.length > 0 ? (
+                            <TableContainer component={Paper} variant="outlined">
+                                <Table size="small" aria-label="conversation inbox">
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell />
+                                            <TableCell>From</TableCell>
+                                            <TableCell>Subject</TableCell>
+                                            <TableCell>Snippet</TableCell>
+                                            <TableCell />
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {threads.slice(0, 10).map((row) => (
+                                            <ConversationRowMini key={row.id} row={row} assistantId={selectedAssistant} />
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        ) : (
+                            <Typography variant="body2" color="text.secondary">No conversation threads found.</Typography>
+                        )}
                     </Box>
                 );
                 break;
@@ -407,7 +544,7 @@ if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
                     ) : (
                         <>
                         <Typography variant="h6" gutterBottom>
-                            To view analytics, you’ll need to add an assistant — but first, choose a plan.
+                            To view analytics, you'll need to add an assistant — but first, choose a plan.
                         </Typography>
                         <Button component={Link} to="/billing" variant="contained" sx={{ mt: 2 }}>
                             Go to Billing
@@ -419,25 +556,9 @@ if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
                 <Grid container spacing={4} sx={{ minHeight: '80vh' }}>
                     {/* Top Row - 3 cards */}
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>
-                        <StatCard 
-                            title="Replies Sent" 
-                            onClick={() => handleCardClick('total')} 
-                        >
-                            {/* --- CHANGE 1, 2 & 3: Reposition and fix the filter --- */}
-                            <FormControl 
-                                variant="standard" 
-                                size="small" 
-                                sx={{ position: 'absolute', top: 24, right: 24, minWidth: 120, zIndex: 10 }}
-                                onClick={(e) => e.stopPropagation()} // Stop click from opening the modal
-                            >
-                                <Select
-                                    labelId="time-filter-label"
-                                    id="time-filter-select"
-                                    value={timeFilter}
-                                    onChange={(e) => setTimeFilter(e.target.value)}
-                                    // Make the dropdown menu solid
-                                    MenuProps={{ PaperProps: { sx: { bgcolor: 'background.paper', backgroundImage: 'none' }}}}
-                                >
+                        <StatCard title="Replies Sent" onClick={() => handleCardClick('total')}>
+                            <FormControl variant="standard" size="small" sx={{ position: 'absolute', top: 24, right: 24, minWidth: 120, zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
+                                <Select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)} MenuProps={{ PaperProps: { sx: { bgcolor: 'background.paper', backgroundImage: 'none' }}}}>
                                     <MenuItem value="today">Today</MenuItem>
                                     <MenuItem value="week">Last 7 Days</MenuItem>
                                     <MenuItem value="4weeks">Last 4 Weeks</MenuItem>
@@ -447,22 +568,11 @@ if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
                                     <MenuItem value="all">All Time</MenuItem>
                                 </Select>
                             </FormControl>
-
-                            {/* The count display, centered */}
                             <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 {isFilterLoading ? (
                                     <CircularProgress />
                                 ) : (
-                                    <Typography 
-                                        component="p" 
-                                        variant="h4" 
-                                        fontWeight="bold"
-                                        sx={{ 
-                                            fontSize: { xs: '2.5rem', sm: '3rem' },
-                                            color: 'primary.main',
-                                            textShadow: '0 0 8px rgba(124,244,248,.45)'
-                                        }}
-                                    >
+                                    <Typography component="p" variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '2.5rem', sm: '3rem' }, color: 'primary.main', textShadow: '0 0 8px rgba(124,244,248,.45)' }}>
                                         {filteredRepliesCount}
                                     </Typography>
                                 )}
@@ -470,30 +580,15 @@ if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
                         </StatCard>
                     </Grid>
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>
-                        <StatCard 
-                            title="Replies (Last 7 Days)" 
-                            value={stats?.emailsLast7Days ?? 0} 
-                            description="In the past week" 
-                            onClick={() => handleCardClick('week')} 
-                        />
+                        <StatCard title="Replies (Last 7 Days)" value={stats?.emailsLast7Days ?? 0} description="In the past week" onClick={() => handleCardClick('week')} />
                     </Grid>
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>
-                        <StatCard 
-                            title="Replies Today" 
-                            value={stats?.emailsToday ?? 0} 
-                            description="Since midnight" 
-                            onClick={() => handleCardClick('today')} 
-                        />
+                        <StatCard title="Replies Today" value={stats?.emailsToday ?? 0} description="Since midnight" onClick={() => handleCardClick('today')} />
                     </Grid>
                     
                     {/* Bottom Row - 3 cards */}
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>
-                        <StatCard 
-                            title="Daily Activity" 
-                            description="Past 7 days"
-                            descColor="#7cf4f8cc"
-                            onClick={() => handleCardClick('daily')}
-                        >
+                        <StatCard title="Daily Activity" description="Past 7 days" descColor="#7cf4f8cc" onClick={() => handleCardClick('daily')}>
                             <ResponsiveContainer width="100%" height={200}>
                                 <BarChart data={dailyChartData} margin={{ top: 20, right: 20, left: -10, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -506,12 +601,7 @@ if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
                         </StatCard>
                     </Grid>
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>
-                        <StatCard 
-                            title="Peak Reply Hours" 
-                            description="Based on all activity"
-                            descColor="#7cf4f8cc"
-                            onClick={() => handleCardClick('hourly')}
-                        >
+                        <StatCard title="Peak Reply Hours" description="Based on all activity" descColor="#7cf4f8cc" onClick={() => handleCardClick('hourly')}>
                             <ResponsiveContainer width="100%" height={200}>
                                 <LineChart data={hourlyChartData} margin={{ top: 20, right: 20, left: -10, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" />
@@ -525,39 +615,53 @@ if (withPics.length > 0) setSelectedAssistant(withPics[0].id);
                     </Grid>
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>
                         <StatCard title="Email Tracking" onClick={() => handleCardClick('engagement')}>
-                            <Grid container spacing={2} alignItems="center" sx={{height: '100%'}}>
-                                <Grid item xs={12} md={4}>
-                                    <Box sx={{ height: 200 }}>
-                                        <ResponsiveContainer>
-                                            <PieChart>
-                                                <Pie data={emailTrackingData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={70} >
-                                                    {emailTrackingData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
-                                                </Pie>
-                                                <Tooltip />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    </Box>
+                            <FormControl variant="standard" size="small" sx={{ position: 'absolute', top: 24, right: 24, minWidth: 120, zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
+                                <Select value={trackingTimeFilter} onChange={(e) => setTrackingTimeFilter(e.target.value)} MenuProps={{ PaperProps: { sx: { bgcolor: 'background.paper', backgroundImage: 'none' }}}}>
+                                    <MenuItem value="today">Today</MenuItem>
+                                    <MenuItem value="week">Last 7 Days</MenuItem>
+                                    <MenuItem value="month">Last 4 Weeks</MenuItem>
+                                    <MenuItem value="3months">Last 3 Months</MenuItem>
+                                    <MenuItem value="6months">Last 6 Months</MenuItem>
+                                    <MenuItem value="year">Last Year</MenuItem>
+                                    <MenuItem value="all">All Time</MenuItem>
+                                </Select>
+                            </FormControl>
+                            
+                            {isTrackingFilterLoading ? (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                                    <CircularProgress />
+                                </Box>
+                            ) : (
+                                <Grid container spacing={2} alignItems="center" sx={{height: '100%'}}>
+                                    <Grid item xs={12} md={4}>
+                                        <Box sx={{ height: 200 }}>
+                                            <ResponsiveContainer>
+                                                <PieChart>
+                                                    <Pie data={emailTrackingData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={70} >
+                                                        {emailTrackingData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
+                                                    </Pie>
+                                                    <Tooltip />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                        </Box>
+                                    </Grid>
+                                    <Grid item xs={12} md={4} sx={{ textAlign: 'center' }}>
+                                         <Typography variant="h2" fontWeight="bold">{filteredTrackingStats?.openRate ?? 0}%</Typography>
+                                         <Typography color="text.secondary" variant="h6">Open Rate</Typography>
+                                    </Grid>
+                                    <Grid item xs={12} md={4}>
+                                        <List>
+                                            <ListItem>
+                                                <ListItemText primary={<Typography fontWeight="bold">{filteredTrackingStats?.regularOpened ?? 0}</Typography>} secondary="Regular Opened" />
+                                            </ListItem>
+                                            <Divider component="li" />
+                                            <ListItem>
+                                                <ListItemText primary={<Typography fontWeight="bold">{filteredTrackingStats?.followUpsOpened ?? 0}</Typography>} secondary="Follow-ups Opened" />
+                                            </ListItem>
+                                        </List>
+                                    </Grid>
                                 </Grid>
-                                <Grid item xs={12} md={4} sx={{ textAlign: 'center' }}>
-                                     <Typography variant="h2" fontWeight="bold">{trackingStats?.openRate ?? 0}%</Typography>
-                                     <Typography color="text.secondary" variant="h6">Open Rate</Typography>
-                                </Grid>
-                                <Grid item xs={12} md={4}>
-                                    <List>
-                                        <ListItem>
-                                            <ListItemText primary={<Typography fontWeight="bold">{trackingStats?.totalOpened ?? 0} / {trackingStats?.totalSent ?? 0}</Typography>} secondary="Total Opened" />
-                                        </ListItem>
-                                        <Divider component="li" />
-                                        <ListItem>
-                                            <ListItemText primary={<Typography fontWeight="bold">{trackingStats?.openedToday ?? 0}</Typography>} secondary="Opened Today" />
-                                        </ListItem>
-                                        <Divider component="li" />
-                                        <ListItem>
-                                            <ListItemText primary={<Typography fontWeight="bold">{trackingStats?.openedLast7Days ?? 0}</Typography>} secondary="Opened Last 7 Days" />
-                                        </ListItem>
-                                    </List>
-                                </Grid>
-                            </Grid>
+                            )}
                         </StatCard>
                     </Grid>
                 </Grid>
