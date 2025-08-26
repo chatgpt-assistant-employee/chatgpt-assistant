@@ -225,6 +225,8 @@ function ConversationRow(props) {
                 <TableCell>{row.snippet}</TableCell>
                 <TableCell align="right" sx={{width: '60px'}}>
                     {/* --- THIS IS THE NEW STATUS LOGIC --- */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+                    {row.isFollowUp && <Chip label="Follow-up" size="small" variant="outlined" color="info" />}
                     {row.status === 'unread' && (
                         <Tooltip title="Unread">
                             <UnreadIcon color="primary" sx={{ fontSize: '14px' }} />
@@ -235,6 +237,7 @@ function ConversationRow(props) {
                             <CheckIcon color="success" sx={{ fontSize: '18px' }} />
                         </Tooltip>
                     )}
+                    </Box>
                 </TableCell>
             </TableRow>
             <TableRow>

@@ -194,6 +194,7 @@ function ConversationRow(props) {
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1, overflowWrap: 'break-word' }}>{row.snippet}</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', pl: 1 }}>
+                        {row.isFollowUp && <Chip label="Follow-up" size="small" variant="outlined" color="info" sx={{ height: '20px' }} />}
                          {isLoading ? <CircularProgress size={20} /> : (open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />)}
                         {row.status === 'unread' && <Tooltip title="Unread"><UnreadIcon color="primary" sx={{ fontSize: '14px', mt: 1 }} /></Tooltip>}
                         {row.status === 'opened' && <Tooltip title="Opened"><CheckIcon color="success" sx={{ fontSize: '18px', mt: 1 }} /></Tooltip>}
@@ -231,6 +232,8 @@ function ConversationRow(props) {
                 <TableCell>{row.snippet}</TableCell>
                 <TableCell align="right" sx={{width: '60px'}}>
                     {/* --- THIS IS THE NEW STATUS LOGIC --- */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+                    {row.isFollowUp && <Chip label="Follow-up" size="small" variant="outlined" color="info" />}
                     {row.status === 'unread' && (
                         <Tooltip title="Unread">
                             <UnreadIcon color="primary" sx={{ fontSize: '14px' }} />
@@ -241,6 +244,7 @@ function ConversationRow(props) {
                             <CheckIcon color="success" sx={{ fontSize: '18px' }} />
                         </Tooltip>
                     )}
+                    </Box>
                 </TableCell>
             </TableRow>
             <TableRow>

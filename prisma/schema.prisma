@@ -82,6 +82,8 @@ model EmailLog {
   createdAt       DateTime @default(now())
   action          String   // e.g., "REPLY_GENERATED", "REPLY_SENT"
 
+  isFollowUp      Boolean  @default(false)
+
   followUpRequired  Boolean  @default(true) // Is a follow-up scheduled for this sent message?
   followUpSent      Boolean  @default(false) // Has the one-time follow-up already been sent?
 

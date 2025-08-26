@@ -2337,7 +2337,8 @@ app.get('/api/threads/:assistantId', isVerified, async (req, res) => {
           subject: subjectHdr.replace(/^Re:\s*/i, ''),
           from: fromHdr.split('<')[0].trim(),
           date: Number(lastMsg.internalDate),
-          status: log ? log.status : null
+          status: log ? log.status : null,
+          isFollowUp: log ? log.isFollowUp : false
         };
       })
     );
