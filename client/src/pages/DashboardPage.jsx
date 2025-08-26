@@ -38,7 +38,7 @@ import {
     AutoAwesome as AiIcon,
     Send as SendIcon // Added for ConversationRow
 } from '@mui/icons-material';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import AssistantPicker from '../components/AssistantPicker';
 import { useUser } from '../contexts/UserContext';
 import { Link } from 'react-router-dom';
