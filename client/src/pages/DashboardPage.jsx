@@ -39,11 +39,17 @@ import AssistantPicker from '../components/AssistantPicker';
 import { useUser } from '../contexts/UserContext';
 import { Link } from 'react-router-dom';
 
-// Mini conversation row for dashboard
-function ConversationRowMini({ row, assistantId }) {
+// This is a new component for a single expandable row in our table
+function ConversationRow(props) {
+    const { row, assistantId, refreshThreads, isMobile} = props;
     const [open, setOpen] = useState(false);
     const [details, setDetails] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [aiReply, setAiReply] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [isSending, setIsSending] = useState(false); // <-- New state for sending
+    const [sendStatus, setSendStatus] = useState(''); // 'success' or 'error'
+    const [extractedData, setExtractedData] = useState(null);
 
     const fetchThreadDetails = async () => {
         if (open) {
@@ -68,6 +74,139 @@ function ConversationRowMini({ row, assistantId }) {
         }
     };
 
+    // fetches thread messages without toggling open
+    const fetchThreadMessages = async () => {
+        try {
+            const response = await fetch(
+              `${import.meta.env.VITE_API_URL}/api/thread/${assistantId}/${row.id}`,
+              { credentials: 'include' }
+            );
+            if (response.ok) {
+                const data = await response.json();
+                setDetails(data);
+                refreshThreads();
+            }
+        } catch (error) {
+            console.error("Failed to fetch thread messages:", error);
+        }
+    };
+
+    // poll messages every 30s when expanded
+    /* useEffect(() => {
+        if (!open) return;
+        fetchThreadMessages();  // initial load when opened
+        const interval = setInterval(fetchThreadMessages, 90000);
+        return () => clearInterval(interval);
+    }, [open, assistantId, row.id]); */
+
+     // The standard reply generator
+    const handleGenerateReply = async () => {
+        setIsGenerating(true);
+        setAiReply('');
+        setExtractedData(null);
+        const conversationText = details.map(m => `From: ${m.from}\n\n${m.body}`).join('\n\n---\n\n');
+        try {
+            const replyRes = await fetch(`${import.meta.env.VITE_API_URL}/api/generate-reply`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ conversation: conversationText, assistantId: assistantId }),
+            });
+            if (replyRes.ok) setAiReply((await replyRes.json()).reply);
+        } catch (error) { console.error("AI reply error:", error); } 
+        finally { setIsGenerating(false); }
+    };
+
+    const handleScanAndReply = async () => {
+        setIsGenerating(true);
+        setAiReply('');
+        setExtractedData(null);
+        const lastMessage = details[details.length - 1];
+        if (!lastMessage) return setIsGenerating(false);
+
+        try {
+            // Step 1: Extract Data
+            const extractRes = await fetch(`${import.meta.env.VITE_API_URL}/api/extract-data`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ text: lastMessage.body }),
+            });
+            const extracted = await extractRes.json();
+            if (!extractRes.ok) throw new Error(extracted.message);
+            setExtractedData(extracted);
+
+            // Step 2: Generate Reply using a more informed prompt
+            const conversationText = details.map(m => `From: ${m.from}\n\n${m.body}`).join('\n\n---\n\n');
+            const replyPrompt = `A potential customer named '${extracted.name || 'this person'}' (email: ${extracted.email || 'unknown'}) sent an inquiry. Based on the full conversation thread below, draft a professional reply. \n\nCONVERSATION:\n"""${conversationText}"""`;
+
+            const replyRes = await fetch(`${import.meta.env.VITE_API_URL}api/generate-reply`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ conversation: replyPrompt, assistantId: assistantId }),
+            });
+            if (replyRes.ok) setAiReply((await replyRes.json()).reply);
+            
+        } catch (error) { console.error("Scan and reply error:", error); } 
+        finally { setIsGenerating(false); }
+    };
+
+    const handleSendReply = async () => {
+        setIsSending(true);
+        setSendStatus('');
+        try {
+            const finalRecipient = extractedData?.email || row.from; // Use extracted email if available
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/send-email`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ assistantId, threadId: row.id, replyText: aiReply, recipient: finalRecipient }),
+            });
+            if (!response.ok) throw new Error('Failed to send');
+            setSendStatus('success');
+            refreshThreads();
+        } catch (error) { setSendStatus('error'); } 
+        finally { setIsSending(false); }
+    };
+
+    if (isMobile) {
+        return (
+            <Paper variant="outlined" sx={{ mb: 1 }}>
+                <ListItem button onClick={fetchThreadDetails} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box sx={{ overflow: 'hidden', flexGrow: 1, pr: 1 }}>
+                        <ListItemText
+                            primary={row.subject}
+                            secondary={`From: ${row.from}`}
+                            primaryTypographyProps={{ fontWeight: 'bold', overflowWrap: 'break-word' }}
+                        />
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1, overflowWrap: 'break-word' }}>{row.snippet}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', pl: 1 }}>
+                         {isLoading ? <CircularProgress size={20} /> : (open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />)}
+                        {row.status === 'unread' && <Tooltip title="Unread"><UnreadIcon color="primary" sx={{ fontSize: '14px', mt: 1 }} /></Tooltip>}
+                        {row.status === 'opened' && <Tooltip title="Opened"><CheckIcon color="success" sx={{ fontSize: '18px', mt: 1 }} /></Tooltip>}
+                    </Box>
+                </ListItem>
+                <Collapse in={open} timeout="auto" unmountOnExit>
+                    {/* This is the same detailed view content from the original component */}
+                    <Box sx={{ p: 2, borderTop: '1px solid rgba(255, 255, 255, 0.12)' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Typography variant="h6" gutterBottom component="div">Conversation History</Typography>
+                            <Box sx={{display: 'flex', gap: 1}}>
+                                <Button variant="outlined" size="small" startIcon={<AiIcon />} disabled={isGenerating} onClick={handleGenerateReply}>{isGenerating ? 'Generating...' : 'Generate Reply'}</Button>
+                                <Button variant="contained" size="small" startIcon={<AiIcon />} disabled={isGenerating} onClick={handleScanAndReply}>{isGenerating ? 'Scanning...' : 'Scan Form & Reply'}</Button>
+                            </Box>
+                        </Box>
+                        {extractedData && <Paper variant="outlined" sx={{ p: 2, my: 2, bgcolor: '#e3f2fd' }}><Typography variant="subtitle2" sx={{ mb: 1 }}>Extracted Data:</Typography><Typography component="pre" sx={{ fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>{JSON.stringify(extractedData, null, 2)}</Typography></Paper>}
+                        {aiReply && <Paper variant="outlined" sx={{ p: 2, my: 2 }}><Typography variant="subtitle2" sx={{ mb: 1 }}>Suggested Reply:</Typography><TextareaAutosize minRows={5} style={{ width: '100%', padding: '8px' }} value={aiReply} onChange={(e) => setAiReply(e.target.value)} /><Box sx={{ mt: 1, display: 'flex', gap: 1 }}><Button variant="contained" color="primary" startIcon={<SendIcon />} disabled={isSending} onClick={handleSendReply}>{isSending ? 'Sending...' : 'Send Email'}</Button></Box>{sendStatus === 'success' && <Alert severity="success" sx={{mt:1}}>Email sent successfully!</Alert>}{sendStatus === 'error' && <Alert severity="error" sx={{mt:1}}>Failed to send email.</Alert>}</Paper>}
+                        {details.map((message) => <Paper key={message.id} variant="outlined" sx={{ p: 2, mb: 2 }}><Typography variant="subtitle2" component="div"><strong>From:</strong> {message.from}</Typography><Divider sx={{ my: 1 }} /><Typography component="pre" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '0.9rem' }}>{message.body}</Typography></Paper>)}
+                    </Box>
+                </Collapse>
+            </Paper>
+        );
+    }
+
     return (
         <>
             <TableRow sx={{ '& > *': { borderBottom: 'unset' } }}>
@@ -80,12 +219,13 @@ function ConversationRowMini({ row, assistantId }) {
                 <TableCell>{row.subject}</TableCell>
                 <TableCell>{row.snippet}</TableCell>
                 <TableCell align="right" sx={{width: '60px'}}>
+                    {/* --- THIS IS THE NEW STATUS LOGIC --- */}
                     {row.status === 'unread' && (
                         <Tooltip title="Unread">
                             <UnreadIcon color="primary" sx={{ fontSize: '14px' }} />
                         </Tooltip>
-                    )}
-                    {row.status === 'opened' && (
+                        )}
+                        {row.status === 'opened' && (
                         <Tooltip title="Opened">
                             <CheckIcon color="success" sx={{ fontSize: '18px' }} />
                         </Tooltip>
@@ -93,21 +233,24 @@ function ConversationRowMini({ row, assistantId }) {
                 </TableCell>
             </TableRow>
             <TableRow>
-                <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={5}>
+                <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
                     <Collapse in={open} timeout="auto" unmountOnExit>
                         <Box sx={{ margin: 1, p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
-                            <Typography variant="h6" gutterBottom component="div">Conversation History</Typography>
-                            {details.map((message) => (
-                                <Paper key={message.id} variant="outlined" sx={{ p: 2, mb: 2 }}>
-                                    <Typography variant="subtitle2" component="div">
-                                        <strong>From:</strong> {message.from}
-                                    </Typography>
-                                    <Divider sx={{ my: 1 }} />
-                                    <Typography component="div" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '0.9rem', wordBreak: 'break-all' }}>
-                                        {message.body}
-                                    </Typography>
-                                </Paper>
-                            ))}
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="h6" gutterBottom component="div">Conversation History</Typography>
+                                {/* --- NEW: Two distinct buttons --- */}
+                                <Box sx={{display: 'flex', gap: 1}}>
+                                    <Button variant="outlined" size="small" startIcon={<AiIcon />} disabled={isGenerating} onClick={handleGenerateReply}>
+                                        {isGenerating ? 'Generating...' : 'Generate Reply'}
+                                    </Button>
+                                    <Button variant="contained" size="small" startIcon={<AiIcon />} disabled={isGenerating} onClick={handleScanAndReply}>
+                                        {isGenerating ? 'Scanning...' : 'Scan Form & Reply'}
+                                    </Button>
+                                </Box>
+                            </Box>
+                            {extractedData && <Paper variant="outlined" sx={{ p: 2, my: 2, bgcolor: '#e3f2fd' }}><Typography variant="subtitle2" sx={{ mb: 1 }}>Extracted Data:</Typography><Typography component="pre" sx={{ fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>{JSON.stringify(extractedData, null, 2)}</Typography></Paper>}
+                            {aiReply && <Paper variant="outlined" sx={{ p: 2, my: 2 }}><Typography variant="subtitle2" sx={{ mb: 1 }}>Suggested Reply:</Typography><TextareaAutosize minRows={5} style={{ width: '100%', padding: '8px' }} value={aiReply} onChange={(e) => setAiReply(e.target.value)} /><Box sx={{ mt: 1, display: 'flex', gap: 1 }}><Button variant="contained" color="primary" startIcon={<SendIcon />} disabled={isSending} onClick={handleSendReply}>{isSending ? 'Sending...' : 'Send Email'}</Button></Box>{sendStatus === 'success' && <Alert severity="success" sx={{mt:1}}>Email sent successfully!</Alert>}{sendStatus === 'error' && <Alert severity="error" sx={{mt:1}}>Failed to send email.</Alert>}</Paper>}
+                            {details.map((message) => <Paper key={message.id} variant="outlined" sx={{ p: 2, mb: 2 }}><Typography variant="subtitle2" component="div"><strong>From:</strong> {message.from}</Typography><Divider sx={{ my: 1 }} /><Typography component="div" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '0.9rem', wordBreak: 'break-all' }}>{message.body}</Typography></Paper>)}
                         </Box>
                     </Collapse>
                 </TableCell>
@@ -205,14 +348,15 @@ const DetailModal = ({ open, onClose, title, content }) => (
     <Dialog 
         open={open} 
         onClose={onClose} 
-        maxWidth="md" 
+        maxWidth={title === 'Conversation Inbox' ? 'lg' : 'md'}
         fullWidth
         PaperProps={{
             sx: {
                 borderRadius: 3,
-                bgcolor: '#26288fff',
+                bgcolor: '#494963ff',
                 backgroundImage: 'none',
-                boxShadow: 6
+                boxShadow: 6,
+                maxHeight: '90vh'
             }
         }}
     >
@@ -422,14 +566,20 @@ function DashboardPage() {
                 break;
             case 'engagement':
                 await fetchThreads();
+                const assistant = assistants.find(a => a.id === selectedAssistant);
                 title = 'Conversation Inbox';
                 content = (
-                    <Box>
+                    <Box sx={{ minHeight: '500px' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                            <Typography variant="body1" color="text.secondary">
-                                Recent conversations and their status
+                            <Typography variant="h6">
+                                {assistant?.name ? `${assistant.name}'s Inbox` : 'Conversation Inbox'}
                             </Typography>
-                            <Button variant="outlined" size="small" startIcon={<RefreshIcon />} onClick={fetchThreads}>
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<RefreshIcon />}
+                                onClick={fetchThreads}
+                            >
                                 Refresh
                             </Button>
                         </Box>
@@ -439,7 +589,7 @@ function DashboardPage() {
                             </Box>
                         ) : threads.length > 0 ? (
                             <TableContainer component={Paper} variant="outlined">
-                                <Table size="small" aria-label="conversation inbox">
+                                <Table aria-label="collapsible table">
                                     <TableHead>
                                         <TableRow>
                                             <TableCell />
@@ -450,14 +600,16 @@ function DashboardPage() {
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {threads.slice(0, 10).map((row) => (
-                                            <ConversationRowMini key={row.id} row={row} assistantId={selectedAssistant} />
+                                        {threads.map((row) => (
+                                            <ConversationRow key={row.id} row={row} assistantId={selectedAssistant} refreshThreads={fetchThreads} />
                                         ))}
                                     </TableBody>
                                 </Table>
                             </TableContainer>
                         ) : (
-                            <Typography variant="body2" color="text.secondary">No conversation threads found.</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                No conversation threads found.
+                            </Typography>
                         )}
                     </Box>
                 );
@@ -650,6 +802,10 @@ function DashboardPage() {
                                     </Grid>
                                     <Grid item xs={12} md={4}>
                                         <List>
+                                            <ListItem>
+                                                <ListItemText primary={<Typography fontWeight="bold">{filteredTrackingStats?.totalOpened ?? 0} / {filteredTrackingStats?.totalSent ?? 0}</Typography>} secondary="Total Opened" />
+                                            </ListItem>
+                                            <Divider component="li" />
                                             <ListItem>
                                                 <ListItemText primary={<Typography fontWeight="bold">{filteredTrackingStats?.regularOpened ?? 0}</Typography>} secondary="Regular Opened" />
                                             </ListItem>
