@@ -571,55 +571,14 @@ function DashboardPage() {
                 );
                 break;
             case 'engagement':
-                await fetchThreads();
-                const assistant = assistants.find(a => a.id === selectedAssistant);
-                title = 'Conversation Inbox';
-                content = (
-                    <Box sx={{ minHeight: '500px' }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                            <Typography variant="h6">
-                                {assistant?.name ? `${assistant.name}'s Inbox` : 'Conversation Inbox'}
-                            </Typography>
-                            <Button
-                                variant="outlined"
-                                size="small"
-                                startIcon={<RefreshIcon />}
-                                onClick={fetchThreads}
-                            >
-                                Refresh
-                            </Button>
-                        </Box>
-                        {isThreadsLoading ? (
-                            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                                <CircularProgress />
-                            </Box>
-                        ) : threads.length > 0 ? (
-                            <TableContainer component={Paper} variant="outlined">
-                                <Table aria-label="collapsible table">
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell />
-                                            <TableCell>From</TableCell>
-                                            <TableCell>Subject</TableCell>
-                                            <TableCell>Snippet</TableCell>
-                                            <TableCell />
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {threads.map((row) => (
-                                            <ConversationRow key={row.id} row={row} assistantId={selectedAssistant} refreshThreads={fetchThreads} />
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-                        ) : (
-                            <Typography variant="body2" color="text.secondary">
-                                No conversation threads found.
-                            </Typography>
-                        )}
-                    </Box>
-                );
-                break;
+                fetchThreads(); // 1. Start fetching the data (no 'await')
+                
+                // 2. Immediately tell the modal to open with the correct title
+                setModalContent({ title: 'Conversation Inbox', content: null }); 
+                setModalOpen(true);
+
+                // 3. Exit the function so the code below doesn't run
+                return; 
             case 'daily':
                 title = 'Daily Activity Pattern';
                 content = (
@@ -833,7 +792,58 @@ function DashboardPage() {
                 open={modalOpen}
                 onClose={() => setModalOpen(false)}
                 title={modalContent.title}
-                content={modalContent.content}
+                content={
+                    // --- THIS IS THE NEW DYNAMIC CONTENT LOGIC ---
+                    modalContent.title === 'Conversation Inbox' ? (
+                        <Box sx={{ minHeight: '500px' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                <Typography variant="h6">
+                                    {assistants.find(a => a.id === selectedAssistant)?.name}'s Inbox
+                                </Typography>
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    startIcon={isThreadsLoading ? <CircularProgress size={16} /> : <RefreshIcon />}
+                                    onClick={fetchThreads}
+                                    disabled={isThreadsLoading}
+                                >
+                                    {isThreadsLoading ? 'Refreshing...' : 'Refresh'}
+                                </Button>
+                            </Box>
+                            {isThreadsLoading ? (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                                    <CircularProgress />
+                                </Box>
+                            ) : threads.length > 0 ? (
+                                <TableContainer component={Paper} variant="outlined">
+                                    <Table aria-label="collapsible table">
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell />
+                                                <TableCell>From</TableCell>
+                                                <TableCell>Subject</TableCell>
+                                                <TableCell>Snippet</TableCell>
+                                                <TableCell />
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {threads.map((row) => (
+                                                <ConversationRow key={row.id} row={row} assistantId={selectedAssistant} refreshThreads={fetchThreads} />
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            ) : (
+                                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', pt: 4 }}>
+                                    No conversation threads found.
+                                </Typography>
+                            )}
+                        </Box>
+                    ) : (
+                        // Fallback for all other simple modals
+                        modalContent.content
+                    )
+                }
             />
         </Box>
     );
