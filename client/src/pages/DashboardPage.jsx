@@ -25,7 +25,9 @@ import {
     TableCell,
     TableBody,
     IconButton,
-    Collapse
+    Collapse,
+    Alert, // Added for ConversationRow
+    TextareaAutosize // Added for ConversationRow
 } from '@mui/material';
 import { 
     KeyboardArrowDown as KeyboardArrowDownIcon, 
@@ -34,6 +36,7 @@ import {
     FiberManualRecord as UnreadIcon,
     Refresh as RefreshIcon,
     AutoAwesome as AiIcon,
+    Send as SendIcon // Added for ConversationRow
 } from '@mui/icons-material';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import AssistantPicker from '../components/AssistantPicker';
@@ -793,7 +796,7 @@ function DashboardPage() {
                                                     <Pie data={emailTrackingData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={70} >
                                                         {emailTrackingData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
                                                     </Pie>
-                                                    <Tooltip />
+                                                    <RechartsTooltip />
                                                 </PieChart>
                                             </ResponsiveContainer>
                                         </Box>
