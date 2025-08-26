@@ -26,6 +26,7 @@ import {
     TableBody,
     IconButton,
     Collapse,
+    Tooltip,
     Alert, // Added for ConversationRow
     TextareaAutosize // Added for ConversationRow
 } from '@mui/material';
