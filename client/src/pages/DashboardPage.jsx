@@ -32,7 +32,8 @@ import {
     KeyboardArrowUp as KeyboardArrowUpIcon,
     Check as CheckIcon,
     FiberManualRecord as UnreadIcon,
-    Refresh as RefreshIcon
+    Refresh as RefreshIcon,
+    AutoAwesome as AiIcon,
 } from '@mui/icons-material';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import AssistantPicker from '../components/AssistantPicker';

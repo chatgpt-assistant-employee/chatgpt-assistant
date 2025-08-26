@@ -3202,73 +3202,85 @@ app.put('/api/user/password', isVerified, async (req, res) => {
 });
 
 app.get('/api/stats/:assistantId', isVerified, async (req, res) => {
-    if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
+    if (!req.session.userId) {
+        return res.status(401).json({ message: 'Not authenticated' });
+    }
 
     try {
         const { assistantId } = req.params;
-        const assistant = await prisma.assistant.findFirst({ where: { id: assistantId, userId: req.session.userId } });
-        if (!assistant) return res.status(403).json({ message: 'Permission denied.' });
+        const { period } = req.query;
 
-        // --- NEW LOGIC: Handle filtered requests for a single count ---
+        const assistant = await prisma.assistant.findFirst({
+            where: { id: assistantId, userId: req.session.userId }
+        });
+
+        if (!assistant) {
+            return res.status(403).json({ message: 'Permission denied.' });
+        }
+
+        // --- NEW & IMPROVED LOGIC ---
         if (period) {
             let startDate;
             const now = new Date();
 
+            // Create a clean start date to avoid modifying 'now'
+            const startOfToday = new Date();
+            startOfToday.setHours(0, 0, 0, 0);
+
             switch (period) {
                 case 'today':
-                    startDate = new Date(now.setHours(0, 0, 0, 0));
+                    startDate = startOfToday;
                     break;
                 case 'week':
-                    startDate = new Date();
-                    startDate.setDate(now.getDate() - 7);
+                    startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
                     break;
                 case '4weeks':
-                    startDate = new Date();
-                    startDate.setDate(now.getDate() - 28);
+                    startDate = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
                     break;
                 case '3months':
-                    startDate = new Date();
-                    startDate.setMonth(now.getMonth() - 3);
+                    startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
                     break;
                 case '6months':
-                    startDate = new Date();
-                    startDate.setMonth(now.getMonth() - 6);
+                    startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
                     break;
                 case 'year':
-                    startDate = new Date();
-                    startDate.setFullYear(now.getFullYear() - 1);
+                    startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
                     break;
                 case 'all':
-                    // No start date needed for 'all time'
+                    // No start date needed
                     break;
                 default:
                     return res.status(400).json({ message: 'Invalid time period specified.' });
             }
 
             const whereClause = { assistantId };
-            if (period !== 'all') {
+            if (period !== 'all' && startDate) {
                 whereClause.createdAt = { gte: startDate };
             }
 
             const count = await prisma.emailLog.count({ where: whereClause });
             return res.json({ count });
         }
-        // --- END OF NEW LOGIC ---
+        // --- END OF IMPROVED LOGIC ---
 
-        const now = new Date();
-        const todayStart = new Date(now.setHours(0, 0, 0, 0));
-        
+        // --- Original logic for the main dashboard load ---
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        const totalEmailsHandled = await prisma.emailLog.count({ where: { assistantId } });
-        const emailsToday = await prisma.emailLog.count({ where: { assistantId, createdAt: { gte: todayStart } } });
-        const emailsLast7Days = await prisma.emailLog.count({ where: { assistantId, createdAt: { gte: sevenDaysAgo } } });
-        const emailsLast30Days = await prisma.emailLog.count({ where: { assistantId, createdAt: { gte: thirtyDaysAgo } } });
-        
+        // Run queries in parallel for efficiency
+        const [totalEmailsHandled, emailsToday, emailsLast7Days, emailsLast30Days] = await Promise.all([
+            prisma.emailLog.count({ where: { assistantId } }),
+            prisma.emailLog.count({ where: { assistantId, createdAt: { gte: todayStart } } }),
+            prisma.emailLog.count({ where: { assistantId, createdAt: { gte: sevenDaysAgo } } }),
+            prisma.emailLog.count({ where: { assistantId, createdAt: { gte: thirtyDaysAgo } } })
+        ]);
+
         res.json({ totalEmailsHandled, emailsToday, emailsLast7Days, emailsLast30Days });
 
     } catch (error) {
