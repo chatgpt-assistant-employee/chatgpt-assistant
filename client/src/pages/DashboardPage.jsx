@@ -413,6 +413,12 @@ function DashboardPage() {
     const [isThreadsLoading, setIsThreadsLoading] = useState(false);
     const [hourlyTimeFilter, setHourlyTimeFilter] = useState('all');
     const [isHourlyChartLoading, setIsHourlyChartLoading] = useState(false);
+    const [topConvoFilter, setTopConvoFilter] = useState('week');
+    const [top5Conversations, setTop5Conversations] = useState([]);
+    const [isTopConvoLoading, setIsTopConvoLoading] = useState(false);
+    const [top10Conversations, setTop10Conversations] = useState([]);
+    const [isTopConvoModalLoading, setIsTopConvoModalLoading] = useState(false);
+    const [summaryCache, setSummaryCache] = useState({});
 
     // Fetch assistants
     useEffect(() => {
@@ -524,6 +530,39 @@ function DashboardPage() {
         fetchHourlyData();
     }, [selectedAssistant, hourlyTimeFilter]);
 
+    useEffect(() => {
+        if (!selectedAssistant) return;
+        const fetchTopConversations = async () => {
+            setIsTopConvoLoading(true);
+            try {
+                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/threads/top?assistantId=${selectedAssistant}&period=${topConvoFilter}&limit=5`, { credentials: 'include' });
+                if (response.ok) {
+                    setTop5Conversations(await response.json());
+                }
+            } catch (error) {
+                console.error("Failed to fetch top conversations:", error);
+            } finally {
+                setIsTopConvoLoading(false);
+            }
+        };
+        fetchTopConversations();
+    }, [selectedAssistant, topConvoFilter]);
+
+    // --- ADD THIS NEW HANDLER FOR HOVER SUMMARIES ---
+    const handleThreadHover = async (threadId) => {
+        if (summaryCache[threadId]) return; // Don't re-fetch if already in cache
+
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/thread/summary/${selectedAssistant}/${threadId}`, { credentials: 'include' });
+            if (response.ok) {
+                const data = await response.json();
+                setSummaryCache(prev => ({ ...prev, [threadId]: data.summary }));
+            }
+        } catch (error) {
+            console.error("Failed to fetch summary for thread:", threadId, error);
+        }
+    };
+
     // Fetch threads
     const fetchThreads = async () => {
         if (!selectedAssistant) return;
@@ -562,28 +601,22 @@ function DashboardPage() {
                     </Box>
                 );
                 break;
-            case 'week':
-                title = 'Last 7 Days Activity';
-                content = (
-                    <Box>
-                        <Typography variant="h4" gutterBottom>{stats?.emailsLast7Days ?? 0}</Typography>
-                        <Typography variant="body1" color="text.secondary" paragraph>
-                            Email replies sent in the past 7 days
-                        </Typography>
-                        <Box sx={{ mt: 2, height: 300 }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={dailyChartData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="name" />
-                                    <YAxis />
-                                    <Tooltip />
-                                    <Bar dataKey="emails" fill="#7e57c2" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </Box>
-                    </Box>
-                );
-                break;
+            case 'topConvo':
+                title = 'Top 10 Conversations';
+                setModalContent({ title, content: null });
+                setModalOpen(true);
+                setIsTopConvoModalLoading(true);
+                try {
+                    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/threads/top?assistantId=${selectedAssistant}&period=${topConvoFilter}&limit=10`, { credentials: 'include' });
+                    if (response.ok) {
+                        setTop10Conversations(await response.json());
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch top 10 conversations", error);
+                } finally {
+                    setIsTopConvoModalLoading(false);
+                }
+                return;
             case 'today':
                 title = 'Today\'s Activity';
                 content = (
@@ -719,7 +752,39 @@ function DashboardPage() {
                         </StatCard>
                     </Grid>
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>
-                        <StatCard title="Replies (Last 7 Days)" value={stats?.emailsLast7Days ?? 0} description="In the past week" onClick={() => handleCardClick('week')} />
+                        <StatCard title="Top Conversations" onClick={() => handleCardClick('topConvo')}>
+                            <FormControl variant="standard" size="small" sx={{ position: 'absolute', top: 24, right: 24, minWidth: 120, zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
+                                <Select value={topConvoFilter} onChange={(e) => setTopConvoFilter(e.target.value)} MenuProps={{ PaperProps: { sx: { bgcolor: 'background.paper', backgroundImage: 'none' }}}}>
+                                    <MenuItem value="today">Today</MenuItem>
+                                    <MenuItem value="week">Last 7 Days</MenuItem>
+                                    <MenuItem value="4weeks">Last 4 Weeks</MenuItem>
+                                    <MenuItem value="3months">Last 3 Months</MenuItem>
+                                    <MenuItem value="6months">Last 6 Months</MenuItem>
+                                    <MenuItem value="year">Last Year</MenuItem>
+                                    <MenuItem value="all">All Time</MenuItem>
+                                </Select>
+                            </FormControl>
+                            {isTopConvoLoading ? (
+                                <CircularProgress />
+                            ) : (
+                                <List sx={{ width: '100%' }}>
+                                    {top5Conversations.map(convo => (
+                                        <Tooltip key={convo.id} title={summaryCache[convo.id] || "Hover to load summary..."} placement="top" arrow onOpen={() => handleThreadHover(convo.id)}>
+                                            <ListItem disablePadding secondaryAction={
+                                                <Typography variant="body2" color="text.secondary">{convo.messageCount}</Typography>
+                                            }>
+                                                <ListItemText 
+                                                    primary={convo.subject || "(No Subject)"}
+                                                    secondary={convo.from}
+                                                    primaryTypographyProps={{ noWrap: true, fontWeight: 500 }}
+                                                    secondaryTypographyProps={{ noWrap: true }}
+                                                />
+                                            </ListItem>
+                                        </Tooltip>
+                                    ))}
+                                </List>
+                            )}
+                        </StatCard>
                     </Grid>
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>
                         <StatCard title="Replies Today" value={stats?.emailsToday ?? 0} description="Since midnight" onClick={() => handleCardClick('today')} />
@@ -880,12 +945,38 @@ function DashboardPage() {
                                 </Typography>
                             )}
                         </Box>
-                    ) : (
-                        // Fallback for all other simple modals
-                        modalContent.content
-                    )
-                }
-            />
+                    ) : modalContent.title === 'Top 10 Conversations' ? (
+                    // --- ADD THIS NEW LOGIC FOR THE TOP 10 MODAL ---
+                    <Box sx={{ minHeight: '400px' }}>
+                        {isTopConvoModalLoading ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                                <CircularProgress />
+                            </Box>
+                        ) : (
+                            <List sx={{ width: '100%' }}>
+                                {top10Conversations.map(convo => (
+                                    <Tooltip key={convo.id} title={summaryCache[convo.id] || "Hover to load summary..."} placement="top" arrow onOpen={() => handleThreadHover(convo.id)}>
+                                        <ListItem disablePadding secondaryAction={
+                                            <Typography variant="body2" color="text.secondary">{convo.messageCount}</Typography>
+                                        }>
+                                            <ListItemText 
+                                                primary={convo.subject || "(No Subject)"}
+                                                secondary={convo.from}
+                                                primaryTypographyProps={{ noWrap: true, fontWeight: 500 }}
+                                                secondaryTypographyProps={{ noWrap: true }}
+                                            />
+                                        </ListItem>
+                                    </Tooltip>
+                                ))}
+                            </List>
+                        )}
+                    </Box>
+                ) : (
+                    // Fallback for all other simple modals
+                    modalContent.content
+                )
+            }
+        />
         </Box>
     );
 }

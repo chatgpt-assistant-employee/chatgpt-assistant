@@ -2371,6 +2371,104 @@ app.get('/api/threads/:assistantId', isVerified, async (req, res) => {
   }
 });
 
+app.get('/api/threads/top', isVerified, async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
+
+    try {
+        const { assistantId, period, limit = 5 } = req.query;
+        const assistant = await prisma.assistant.findFirst({ where: { id: assistantId, userId: req.session.userId } });
+        if (!assistant || !assistant.googleTokens) return res.status(403).json({ message: 'Permission denied or Gmail not connected.' });
+
+        const gmail = await getGmailClientAndPersist(assistant);
+
+        // Determine date range for filtering
+        let startDate;
+        if (period && period !== 'all') {
+            const now = new Date();
+            switch (period) {
+                case 'today': startDate = new Date(new Date().setHours(0, 0, 0, 0)); break;
+                case 'week': startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
+                case '4weeks': startDate = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000); break;
+                case '3months': startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()); break;
+                case '6months': startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate()); break;
+                case 'year': startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()); break;
+            }
+        }
+
+        const listRes = await gmail.users.threads.list({ userId: 'me', maxResults: 100, q: 'is:inbox' });
+        if (!listRes.data.threads) return res.json([]);
+
+        let threadsWithDetails = await Promise.all(
+            listRes.data.threads.map(async (t) => {
+                try {
+                    const details = await gmail.users.threads.get({ userId: 'me', id: t.id, format: 'metadata', metadataHeaders: ['Subject', 'From', 'Date'] });
+                    const lastMessage = details.data.messages[details.data.messages.length - 1];
+                    const lastMessageDate = new Date(parseInt(lastMessage.internalDate, 10));
+
+                    // If a date filter exists and the thread is outside the range, skip it
+                    if (startDate && lastMessageDate < startDate) {
+                        return null;
+                    }
+
+                    const hdrs = lastMessage.payload.headers;
+                    return {
+                        id: t.id,
+                        subject: hdrs.find(h => h.name === 'Subject')?.value || '',
+                        from: (hdrs.find(h => h.name === 'From')?.value || '').split('<')[0].trim(),
+                        messageCount: details.data.messages.length
+                    };
+                } catch (error) {
+                    return null; // Ignore threads that fail to fetch
+                }
+            })
+        );
+        
+        // Filter out nulls, sort by message count, and take the limit
+        const sortedThreads = threadsWithDetails
+            .filter(Boolean)
+            .sort((a, b) => b.messageCount - a.messageCount)
+            .slice(0, parseInt(limit, 10));
+
+        res.json(sortedThreads);
+
+    } catch (error) {
+        console.error("Error fetching top threads:", error);
+        res.status(500).json({ message: 'Failed to fetch top threads.' });
+    }
+});
+
+app.get('/api/thread/summary/:assistantId/:threadId', isVerified, async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
+    try {
+        const { assistantId, threadId } = req.params;
+        const assistant = await prisma.assistant.findFirst({ where: { id: assistantId, userId: req.session.userId } });
+        if (!assistant || !assistant.googleTokens) return res.status(403).json({ message: 'Permission denied.' });
+
+        const gmail = await getGmailClientAndPersist(assistant);
+        const threadResponse = await gmail.users.threads.get({ userId: 'me', id: threadId });
+
+        const conversationText = threadResponse.data.messages.map(message => {
+            const from = message.payload.headers.find(h => h.name === 'From')?.value || 'No Sender';
+            const body = getBody(message.payload); // Assumes getBody function exists from your file
+            return `From: ${from}\n\n${body}`;
+        }).join('\n\n---\n\n');
+
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [{
+                role: 'user',
+                content: `Summarize the key points of the following email thread in a single, concise sentence (max 25 words). EMAIL THREAD:\n\n"""${conversationText.substring(0, 4000)}"""`
+            }],
+        });
+
+        res.json({ summary: completion.choices[0].message.content });
+
+    } catch (error) {
+        console.error("Error generating summary:", error);
+        res.status(500).json({ message: 'Failed to generate summary.' });
+    }
+});
+
 // GET FULL CONTENT of a specific thread
 app.get('/api/thread/:assistantId/:threadId', isVerified, async (req, res) => {
     if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
