@@ -34,6 +34,7 @@ import {
 import { 
     KeyboardArrowDown as KeyboardArrowDownIcon, 
     KeyboardArrowUp as KeyboardArrowUpIcon,
+    KeyboardArrowLeft as KeyboardArrowLeftIcon,
     Check as CheckIcon,
     FiberManualRecord as UnreadIcon,
     Refresh as RefreshIcon,
@@ -421,6 +422,10 @@ function DashboardPage() {
     const [top10Conversations, setTop10Conversations] = useState([]);
     const [isTopConvoModalLoading, setIsTopConvoModalLoading] = useState(false);
     const [summaryCache, setSummaryCache] = useState({});
+    const [selectedThreadDetails, setSelectedThreadDetails] = useState([]);
+    const [selectedThreadSubject, setSelectedThreadSubject] = useState('');
+    const [isThreadDetailsLoading, setIsThreadDetailsLoading] = useState(false);
+    const [showThreadDetails, setShowThreadDetails] = useState(false);
 
     // Fetch assistants
     useEffect(() => {
@@ -548,26 +553,15 @@ function DashboardPage() {
 
         const fetchTopConversations = async () => {
             setIsTopConvoLoading(true);
-            console.log('Frontend: selectedAssistant =', selectedAssistant);
-            console.log('Frontend: topConvoFilter =', topConvoFilter);
-            
             try {
-                const url = `${import.meta.env.VITE_API_URL}/api/threads/top?assistantId=${selectedAssistant}&period=${topConvoFilter}&limit=5`;
-                console.log('Frontend: Making request to', url);
-                
-                const response = await fetch(url, { credentials: 'include' });
-                console.log('Frontend: Response status', response.status);
-                
+                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/threads/top?assistantId=${selectedAssistant}&period=${topConvoFilter}&limit=5`, { credentials: 'include' });
                 if (response.ok) {
-                    const data = await response.json();
-                    setTop5Conversations(data);
+                    setTop5Conversations(await response.json());
                 } else {
-                    const errorText = await response.text();
-                    console.error('Frontend: Error response', errorText);
-                    setTop5Conversations([]);
+                    setTop5Conversations([]); // Clear on error
                 }
             } catch (error) {
-                console.error("Frontend: Failed to fetch top conversations:", error);
+                console.error("Failed to fetch top conversations:", error);
                 setTop5Conversations([]);
             } finally {
                 setIsTopConvoLoading(false);
@@ -588,6 +582,29 @@ function DashboardPage() {
             }
         } catch (error) {
             console.error("Failed to fetch summary for thread:", threadId, error);
+        }
+    };
+    const handleThreadClick = async (threadId, subject) => {
+        setIsThreadDetailsLoading(true);
+        setSelectedThreadSubject(subject || "(No Subject)");
+        setShowThreadDetails(true);
+        
+        try {
+            const response = await fetch(
+                `${import.meta.env.VITE_API_URL}/api/thread/${selectedAssistant}/${threadId}`,
+                { credentials: 'include' }
+            );
+            if (response.ok) {
+                const data = await response.json();
+                setSelectedThreadDetails(data);
+            } else {
+                setSelectedThreadDetails([]);
+            }
+        } catch (error) {
+            console.error("Failed to fetch thread details:", error);
+            setSelectedThreadDetails([]);
+        } finally {
+            setIsThreadDetailsLoading(false);
         }
     };
 
@@ -813,24 +830,88 @@ function DashboardPage() {
                             </FormControl>
                             
                             {!currentAssistant?.googleTokens ? (
-                                <Box sx={{ textAlign: 'center' }}>
+                                <Box sx={{ textAlign: 'center', py: 4 }}>
                                     <Typography>Connect to Gmail to view top conversations.</Typography>
-                                    <Button component={RouterLink} to={`/assistant/${selectedAssistant}`} startIcon={<LinkIcon/>} sx={{mt: 2}} variant="outlined">Connect Now</Button>
+                                    <Button component={Link} to={`/assistant/${selectedAssistant}`} startIcon={<LinkIcon/>} sx={{mt: 2}} variant="outlined">Connect Now</Button>
                                 </Box>
                             ) : isTopConvoLoading ? (
-                                <CircularProgress />
+                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+                                    <CircularProgress />
+                                </Box>
                             ) : top5Conversations.length > 0 ? (
-                                <List sx={{ width: '100%' }}>
-                                    {top5Conversations.map(convo => (
-                                        <Tooltip key={convo.id} title={summaryCache[convo.id] || "Hover to load summary..."} placement="top" arrow onOpen={() => handleThreadHover(convo.id)}>
-                                            <ListItem disablePadding secondaryAction={ <Typography variant="body2" color="text.secondary">{convo.messageCount}</Typography> }>
-                                                <ListItemText primary={convo.subject || "(No Subject)"} secondary={convo.from} primaryTypographyProps={{ noWrap: true, fontWeight: 500 }} secondaryTypographyProps={{ noWrap: true }} />
-                                            </ListItem>
-                                        </Tooltip>
-                                    ))}
-                                </List>
+                                <Box sx={{ width: '100%', py: 2, height: '100%', overflow: 'hidden' }}>
+                                    <List sx={{ width: '100%', p: 0 }}>
+                                        {top5Conversations.map(convo => (
+                                            <Tooltip key={convo.id} title={summaryCache[convo.id] || "Hover to load summary..."} placement="top" arrow onOpen={() => handleThreadHover(convo.id)}>
+                                                <ListItem 
+                                                    sx={{ 
+                                                        px: 0, 
+                                                        py: 0.5,
+                                                        minHeight: '48px',
+                                                        display: 'flex',
+                                                        alignItems: 'center'
+                                                    }}
+                                                >
+                                                    <ListItemText 
+                                                        primary={
+                                                            <Typography 
+                                                                variant="body2" 
+                                                                sx={{ 
+                                                                    fontWeight: 500,
+                                                                    overflow: 'hidden',
+                                                                    textOverflow: 'ellipsis',
+                                                                    whiteSpace: 'nowrap',
+                                                                    pr: 1
+                                                                }}
+                                                            >
+                                                                {convo.subject?.length > 30 ? `${convo.subject.substring(0, 30)}...` : (convo.subject || "(No Subject)")}
+                                                            </Typography>
+                                                        }
+                                                        secondary={
+                                                            <Typography 
+                                                                variant="caption" 
+                                                                color="text.secondary"
+                                                                sx={{ 
+                                                                    overflow: 'hidden',
+                                                                    textOverflow: 'ellipsis',
+                                                                    whiteSpace: 'nowrap',
+                                                                    pr: 1
+                                                                }}
+                                                            >
+                                                                {convo.from?.length > 25 ? `${convo.from.substring(0, 25)}...` : convo.from}
+                                                            </Typography>
+                                                        }
+                                                        sx={{ 
+                                                            flex: 1,
+                                                            minWidth: 0 // This allows the text to shrink
+                                                        }}
+                                                    />
+                                                    <Box sx={{ 
+                                                        ml: 'auto', 
+                                                        flexShrink: 0,
+                                                        minWidth: '32px',
+                                                        textAlign: 'right'
+                                                    }}>
+                                                        <Typography 
+                                                            variant="body2" 
+                                                            color="text.secondary"
+                                                            sx={{ 
+                                                                fontWeight: 600,
+                                                                fontSize: '0.875rem'
+                                                            }}
+                                                        >
+                                                            {convo.messageCount}
+                                                        </Typography>
+                                                    </Box>
+                                                </ListItem>
+                                            </Tooltip>
+                                        ))}
+                                    </List>
+                                </Box>
                             ) : (
-                                <Typography color="text.secondary">No conversations found for this period.</Typography>
+                                <Box sx={{ textAlign: 'center', py: 4 }}>
+                                    <Typography color="text.secondary">No conversations found for this period.</Typography>
+                                </Box>
                             )}
                         </StatCard>
                     </Grid>
@@ -994,32 +1075,112 @@ function DashboardPage() {
                             )}
                         </Box>
                     ) : modalContent.title === 'Top 10 Conversations' ? (
-                    // --- ADD THIS NEW LOGIC FOR THE TOP 10 MODAL ---
-                    <Box sx={{ minHeight: '400px' }}>
-                        {isTopConvoModalLoading ? (
-                            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                                <CircularProgress />
-                            </Box>
-                        ) : (
-                            <List sx={{ width: '100%' }}>
-                                {top10Conversations.map(convo => (
-                                    <Tooltip key={convo.id} title={summaryCache[convo.id] || "Hover to load summary..."} placement="top" arrow onOpen={() => handleThreadHover(convo.id)}>
-                                        <ListItem disablePadding secondaryAction={
-                                            <Typography variant="body2" color="text.secondary">{convo.messageCount}</Typography>
-                                        }>
-                                            <ListItemText 
-                                                primary={convo.subject || "(No Subject)"}
-                                                secondary={convo.from}
-                                                primaryTypographyProps={{ noWrap: true, fontWeight: 500 }}
-                                                secondaryTypographyProps={{ noWrap: true }}
-                                            />
-                                        </ListItem>
-                                    </Tooltip>
-                                ))}
-                            </List>
-                        )}
-                    </Box>
-                ) : (
+                        <Box sx={{ minHeight: '400px' }}>
+                            {showThreadDetails ? (
+                                // Thread details view
+                                <Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                        <Button 
+                                            startIcon={<KeyboardArrowLeftIcon />} 
+                                            onClick={() => setShowThreadDetails(false)}
+                                            sx={{ mr: 2 }}
+                                        >
+                                            Back
+                                        </Button>
+                                        <Typography variant="h6" sx={{ flexGrow: 1 }}>
+                                            {selectedThreadSubject}
+                                        </Typography>
+                                    </Box>
+                                    
+                                    {isThreadDetailsLoading ? (
+                                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                                            <CircularProgress />
+                                        </Box>
+                                    ) : (
+                                        <Box>
+                                            {selectedThreadDetails.map((message, index) => (
+                                                <Paper key={message.id || index} variant="outlined" sx={{ p: 2, mb: 2 }}>
+                                                    <Typography variant="subtitle2" component="div">
+                                                        <strong>From:</strong> {message.from}
+                                                    </Typography>
+                                                    <Divider sx={{ my: 1 }} />
+                                                    <Typography 
+                                                        component="div" 
+                                                        sx={{ 
+                                                            whiteSpace: 'pre-wrap', 
+                                                            fontFamily: 'inherit', 
+                                                            fontSize: '0.9rem',
+                                                            wordBreak: 'break-word',
+                                                            maxHeight: '300px',
+                                                            overflow: 'auto'
+                                                        }}
+                                                    >
+                                                        {message.body}
+                                                    </Typography>
+                                                </Paper>
+                                            ))}
+                                        </Box>
+                                    )}
+                                </Box>
+                            ) : (
+                                // List of top 10 conversations
+                                <>
+                                    {isTopConvoModalLoading ? (
+                                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                                            <CircularProgress />
+                                        </Box>
+                                    ) : (
+                                        <List sx={{ width: '100%' }}>
+                                            {top10Conversations.map((convo, index) => (
+                                                <Tooltip 
+                                                    key={convo.id} 
+                                                    title={summaryCache[convo.id] || "Hover to load summary..."} 
+                                                    placement="top" 
+                                                    arrow 
+                                                    onOpen={() => handleThreadHover(convo.id)}
+                                                >
+                                                    <ListItem 
+                                                        button
+                                                        onClick={() => handleThreadClick(convo.id, convo.subject)}
+                                                        sx={{
+                                                            borderRadius: 1,
+                                                            mb: 1,
+                                                            '&:hover': {
+                                                                backgroundColor: 'action.hover'
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Box sx={{ mr: 2, minWidth: '24px' }}>
+                                                            <Typography variant="body2" color="text.secondary">
+                                                                #{index + 1}
+                                                            </Typography>
+                                                        </Box>
+                                                        <ListItemText 
+                                                            primary={
+                                                                <Typography sx={{ fontWeight: 500 }}>
+                                                                    {convo.subject?.length > 50 ? `${convo.subject.substring(0, 50)}...` : (convo.subject || "(No Subject)")}
+                                                                </Typography>
+                                                            }
+                                                            secondary={
+                                                                <Typography variant="body2" color="text.secondary">
+                                                                    From: {convo.from?.length > 40 ? `${convo.from.substring(0, 40)}...` : convo.from}
+                                                                </Typography>
+                                                            }
+                                                        />
+                                                        <Box sx={{ ml: 2, textAlign: 'right' }}>
+                                                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                                                                {convo.messageCount} msgs
+                                                            </Typography>
+                                                        </Box>
+                                                    </ListItem>
+                                                </Tooltip>
+                                            ))}
+                                        </List>
+                                    )}
+                                </>
+                            )}
+                        </Box>
+                    ) : (
                     // Fallback for all other simple modals
                     modalContent.content
                 )
