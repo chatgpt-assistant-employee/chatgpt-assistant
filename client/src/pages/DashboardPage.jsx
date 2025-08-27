@@ -408,6 +408,8 @@ function DashboardPage() {
     const [isTrackingFilterLoading, setIsTrackingFilterLoading] = useState(false);
     const [threads, setThreads] = useState([]);
     const [isThreadsLoading, setIsThreadsLoading] = useState(false);
+    const [hourlyTimeFilter, setHourlyTimeFilter] = useState('all');
+    const [isHourlyChartLoading, setIsHourlyChartLoading] = useState(false);
 
     // Fetch assistants
     useEffect(() => {
@@ -441,12 +443,10 @@ function DashboardPage() {
                 const [statsRes, dailyChartRes, hourlyChartRes, trackingRes] = await Promise.all([
                     fetch(`${import.meta.env.VITE_API_URL}/api/stats/${selectedAssistant}`, { credentials: 'include' }),
                     fetch(`${import.meta.env.VITE_API_URL}/api/stats/chart/${selectedAssistant}`, { credentials: 'include' }),
-                    fetch(`${import.meta.env.VITE_API_URL}/api/stats/hourly/${selectedAssistant}`, { credentials: 'include' }),
                     fetch(`${import.meta.env.VITE_API_URL}/api/stats/tracking/${selectedAssistant}`, { credentials: 'include' })
                 ]);
                 if (statsRes.ok) setStats(await statsRes.json());
                 if (dailyChartRes.ok) setDailyChartData(await dailyChartRes.json());
-                if (hourlyChartRes.ok) setHourlyChartData(await hourlyChartRes.json());
                 if (trackingRes.ok) {
                     const data = await trackingRes.json();
                     setTrackingStats(data);
@@ -501,6 +501,25 @@ function DashboardPage() {
         };
         fetchFilteredTrackingStats();
     }, [selectedAssistant, trackingTimeFilter]);
+
+    useEffect(() => {
+        if (!selectedAssistant) return;
+
+        const fetchHourlyData = async () => {
+            setIsHourlyChartLoading(true);
+            try {
+                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stats/hourly/${selectedAssistant}?period=${hourlyTimeFilter}`, { credentials: 'include' });
+                if (response.ok) {
+                    setHourlyChartData(await response.json());
+                }
+            } catch (error) {
+                console.error("Failed to fetch filtered hourly data:", error);
+            } finally {
+                setIsHourlyChartLoading(false);
+            }
+        };
+        fetchHourlyData();
+    }, [selectedAssistant, hourlyTimeFilter]);
 
     // Fetch threads
     const fetchThreads = async () => {
@@ -721,15 +740,35 @@ function DashboardPage() {
                     </Grid>
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>
                         <StatCard title="Peak Reply Hours" description="Based on all activity" descColor="#7cf4f8cc" onClick={() => handleCardClick('hourly')}>
-                            <ResponsiveContainer width="100%" height={200}>
-                                <LineChart data={hourlyChartData} margin={{ top: 20, right: 20, left: -10, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="hour" fontSize={12} tick={{ fill: '#7cf4f8' }} />
-                                    <YAxis allowDecimals={false} fontSize={12} tick={{ fill: '#7cf4f8' }} />
-                                    <Tooltip wrapperStyle={{ zIndex: 1000 }} contentStyle={{ borderRadius: 8, boxShadow: '2px 2px 10px rgba(0,0,0,0.1)' }} />
-                                    <Line type="monotone" dataKey="emails" name="Replies" stroke="#8884d8" strokeWidth={2} />
-                                </LineChart>
-                            </ResponsiveContainer>
+                            {/* --- ADD THIS FILTER DROPDOWN --- */}
+                            <FormControl variant="standard" size="small" sx={{ position: 'absolute', top: 24, right: 24, minWidth: 120, zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
+                                <Select value={hourlyTimeFilter} onChange={(e) => setHourlyTimeFilter(e.target.value)} MenuProps={{ PaperProps: { sx: { bgcolor: 'background.paper', backgroundImage: 'none' }}}}>
+                                    <MenuItem value="today">Today</MenuItem>
+                                    <MenuItem value="week">Last 7 Days</MenuItem>
+                                    <MenuItem value="4weeks">Last 4 Weeks</MenuItem>
+                                    <MenuItem value="3months">Last 3 Months</MenuItem>
+                                    <MenuItem value="6months">Last 6 Months</MenuItem>
+                                    <MenuItem value="year">Last Year</MenuItem>
+                                    <MenuItem value="all">All Time</MenuItem>
+                                </Select>
+                            </FormControl>
+
+                            {/* --- WRAP THE CHART IN A LOADER --- */}
+                            {isHourlyChartLoading ? (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%'}}>
+                                    <CircularProgress />
+                                </Box>
+                            ) : (
+                                <ResponsiveContainer width="100%" height={200}>
+                                    <LineChart data={hourlyChartData} margin={{ top: 20, right: 20, left: -10, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="hour" fontSize={12} tick={{ fill: '#7cf4f8' }} />
+                                        <YAxis allowDecimals={false} fontSize={12} tick={{ fill: '#7cf4f8' }} />
+                                        <RechartsTooltip wrapperStyle={{ zIndex: 1000 }} contentStyle={{ borderRadius: 8, boxShadow: '2px 2px 10px rgba(0,0,0,0.1)' }} />
+                                        <Line type="monotone" dataKey="emails" name="Replies" stroke="#8884d8" strokeWidth={2} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            )}
                         </StatCard>
                     </Grid>
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>

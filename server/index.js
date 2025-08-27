@@ -3346,21 +3346,57 @@ app.get('/api/stats/hourly/:assistantId', isVerified, async (req, res) => {
 
     try {
         const { assistantId } = req.params;
+        const { period } = req.query; // <-- Read the new period parameter
+
         const assistant = await prisma.assistant.findFirst({ where: { id: assistantId, userId: req.session.userId }});
         if (!assistant) return res.status(403).json({ message: 'Permission denied.' });
 
+        // --- NEW: Time filtering logic ---
+        let startDate;
+        const now = new Date();
+
+        switch (period) {
+            case 'today':
+                startDate = new Date(new Date().setHours(0, 0, 0, 0));
+                break;
+            case 'week':
+                startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                break;
+            case '4weeks':
+                startDate = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+                break;
+            case '3months':
+                startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+                break;
+            case '6months':
+                startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+                break;
+            case 'year':
+                startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+                break;
+            case 'all':
+            default:
+                startDate = null; // No date filter for 'all time'
+                break;
+        }
+
+        const whereClause = { assistantId };
+        if (startDate) {
+            whereClause.createdAt = { gte: startDate };
+        }
+        // --- END of new logic ---
+
         const logs = await prisma.emailLog.findMany({
-            where: { assistantId: assistantId },
+            where: whereClause, // <-- Use the new whereClause
         });
 
-        // Initialize 24 hours with 0 counts
         const hourlyCounts = Array(24).fill(0).map((_, i) => ({
             hour: i,
             emails: 0,
         }));
 
         logs.forEach(log => {
-            const hour = new Date(log.createdAt).getHours(); // Get hour (0-23)
+            const hour = new Date(log.createdAt).getHours();
             if (hourlyCounts[hour]) {
                 hourlyCounts[hour].emails++;
             }
