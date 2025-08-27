@@ -451,22 +451,27 @@ function DashboardPage() {
         const fetchDashboardData = async () => {
             setIsLoading(true);
             try {
+                // --- THIS Promise.all IS THE PROBLEM AREA ---
                 const [statsRes, dailyChartRes, hourlyChartRes, trackingRes] = await Promise.all([
                     fetch(`${import.meta.env.VITE_API_URL}/api/stats/${selectedAssistant}`, { credentials: 'include' }),
                     fetch(`${import.meta.env.VITE_API_URL}/api/stats/chart/${selectedAssistant}`, { credentials: 'include' }),
+                    // --- ADD THIS LINE BACK ---
+                    fetch(`${import.meta.env.VITE_API_URL}/api/stats/hourly/${selectedAssistant}`, { credentials: 'include' }),
                     fetch(`${import.meta.env.VITE_API_URL}/api/stats/tracking/${selectedAssistant}`, { credentials: 'include' })
                 ]);
                 if (statsRes.ok) setStats(await statsRes.json());
                 if (dailyChartRes.ok) setDailyChartData(await dailyChartRes.json());
+                // --- AND ADD THIS LINE BACK ---
+                if (hourlyChartRes.ok) setHourlyChartData(await hourlyChartRes.json());
                 if (trackingRes.ok) {
                     const data = await trackingRes.json();
                     setTrackingStats(data);
                     setFilteredTrackingStats(data);
                 }
-            } catch (error) { 
-                console.error("Failed to fetch dashboard data:", error); 
-            } finally { 
-                setIsLoading(false); 
+            } catch (error) {
+                console.error("Failed to fetch dashboard data:", error);
+            } finally {
+                setIsLoading(false);
             }
         };
         fetchDashboardData();
