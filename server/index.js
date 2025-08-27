@@ -2372,44 +2372,84 @@ app.get('/api/threads/:assistantId', isVerified, async (req, res) => {
 });
 
 app.get('/api/threads/top', isVerified, async (req, res) => {
-    if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
+    console.log('=== /api/threads/top DEBUG START ===');
+    console.log('req.session:', req.session);
+    console.log('req.session.userId:', req.session.userId);
+    console.log('req.query:', req.query);
+    console.log('req.params:', req.params);
+
+    if (!req.session.userId) {
+        console.log('ERROR: No session user ID');
+        return res.status(401).json({ message: 'Not authenticated' });
+    }
 
     try {
-        const { assistantId } = req.query; // This is correct - it's in query params
+        const { assistantId } = req.query;
+        console.log('Extracted assistantId:', assistantId);
 
-        // --- FIXED: Add validation for assistantId ---
         if (!assistantId) {
+            console.log('ERROR: No assistantId provided');
             return res.status(400).json({ message: 'assistantId is required' });
         }
 
-        console.log('--- Top Threads Request ---');
-        console.log('Session User ID:', req.session.userId);
-        console.log('Requested Assistant ID:', assistantId);
+        // Check if user exists
+        const user = await prisma.user.findUnique({ 
+            where: { id: req.session.userId },
+            select: { id: true, email: true }
+        });
+        console.log('User found:', user);
 
+        if (!user) {
+            console.log('ERROR: User not found in database');
+            return res.status(401).json({ message: 'User not found' });
+        }
+
+        // Check all assistants for this user
+        const allUserAssistants = await prisma.assistant.findMany({
+            where: { userId: req.session.userId },
+            select: { id: true, name: true, userId: true }
+        });
+        console.log('All assistants for user:', allUserAssistants);
+
+        // Try to find the specific assistant
         const assistant = await prisma.assistant.findFirst({ 
             where: { 
                 id: assistantId, 
                 userId: req.session.userId 
             } 
         });
-
-        console.log('Assistant found based on both IDs:', assistant ? `Yes, named '${assistant.name}'` : 'No');
+        console.log('Specific assistant found:', assistant);
 
         if (!assistant) {
-            const assistantExists = await prisma.assistant.findUnique({ where: { id: assistantId } });
+            // Check if assistant exists at all
+            const assistantExists = await prisma.assistant.findUnique({ 
+                where: { id: assistantId },
+                select: { id: true, userId: true, name: true }
+            });
+            console.log('Assistant exists (any user):', assistantExists);
+            
             if (!assistantExists) {
+                console.log('ERROR: Assistant does not exist');
                 return res.status(404).json({ message: 'Assistant not found.' });
+            } else {
+                console.log('ERROR: Assistant exists but belongs to different user');
+                console.log('Assistant userId:', assistantExists.userId);
+                console.log('Session userId:', req.session.userId);
+                return res.status(403).json({ message: 'You do not have permission to access this assistant.' });
             }
-            return res.status(403).json({ message: 'You do not have permission to access this assistant.' });
         }
 
         if (!assistant.googleTokens) {
+            console.log('ERROR: Assistant not connected to Gmail');
             return res.status(403).json({ message: 'This assistant is not connected to a Gmail account.' });
         }
+
+        console.log('=== All checks passed, proceeding with Gmail API ===');
 
         // Rest of your existing code...
         const gmail = await getGmailClientAndPersist(assistant);
         const { period, limit = 5 } = req.query;
+        
         let startDate;
         if (period && period !== 'all') {
             const now = new Date();
@@ -2422,8 +2462,10 @@ app.get('/api/threads/top', isVerified, async (req, res) => {
                 case 'year': startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()); break;
             }
         }
+
         const listRes = await gmail.users.threads.list({ userId: 'me', maxResults: 30, q: 'is:inbox' });
         if (!listRes.data.threads) return res.json([]);
+
         let threadsWithDetails = await Promise.all(
             listRes.data.threads.map(async (t) => {
                 try {
@@ -2436,10 +2478,13 @@ app.get('/api/threads/top', isVerified, async (req, res) => {
                 } catch (error) { return null; }
             })
         );
+
         const sortedThreads = threadsWithDetails.filter(Boolean).sort((a, b) => b.messageCount - a.messageCount).slice(0, parseInt(limit, 10));
+        console.log('=== SUCCESS: Returning threads ===');
         res.json(sortedThreads);
+
     } catch (error) {
-        console.error("Error fetching top threads:", error);
+        console.error("=== ERROR in /api/threads/top ===:", error);
         res.status(500).json({ message: 'Failed to fetch top threads.' });
     }
 });

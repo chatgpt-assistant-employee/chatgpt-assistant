@@ -548,15 +548,26 @@ function DashboardPage() {
 
         const fetchTopConversations = async () => {
             setIsTopConvoLoading(true);
+            console.log('Frontend: selectedAssistant =', selectedAssistant);
+            console.log('Frontend: topConvoFilter =', topConvoFilter);
+            
             try {
-                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/threads/top?assistantId=${selectedAssistant}&period=${topConvoFilter}&limit=5`, { credentials: 'include' });
+                const url = `${import.meta.env.VITE_API_URL}/api/threads/top?assistantId=${selectedAssistant}&period=${topConvoFilter}&limit=5`;
+                console.log('Frontend: Making request to', url);
+                
+                const response = await fetch(url, { credentials: 'include' });
+                console.log('Frontend: Response status', response.status);
+                
                 if (response.ok) {
-                    setTop5Conversations(await response.json());
+                    const data = await response.json();
+                    setTop5Conversations(data);
                 } else {
-                    setTop5Conversations([]); // Clear on error
+                    const errorText = await response.text();
+                    console.error('Frontend: Error response', errorText);
+                    setTop5Conversations([]);
                 }
             } catch (error) {
-                console.error("Failed to fetch top conversations:", error);
+                console.error("Frontend: Failed to fetch top conversations:", error);
                 setTop5Conversations([]);
             } finally {
                 setIsTopConvoLoading(false);
