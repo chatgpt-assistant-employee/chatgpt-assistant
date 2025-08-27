@@ -2413,7 +2413,7 @@ app.get('/api/threads/top', isVerified, async (req, res) => {
                 case 'year': startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()); break;
             }
         }
-        const listRes = await gmail.users.threads.list({ userId: 'me', maxResults: 100, q: 'is:inbox' });
+        const listRes = await gmail.users.threads.list({ userId: 'me', maxResults: 30, q: 'is:inbox' });
         if (!listRes.data.threads) return res.json([]);
         let threadsWithDetails = await Promise.all(
             listRes.data.threads.map(async (t) => {
