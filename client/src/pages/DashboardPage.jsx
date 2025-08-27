@@ -277,7 +277,7 @@ const StatCard = ({ title, value, description, children, onClick, titleColor = '
         sx={{
             width: '100%',
             height: '100%',
-            height: { xs: 280, sm: 320, lg: 380 },
+            minHeight: { xs: 280, sm: 320, lg: 380 },
             minWidth: { xs: 340, sm: 380, lg: 500 },
             textAlign: 'left',
             p: 0,
@@ -854,7 +854,8 @@ function DashboardPage() {
                                                                                     '& .MuiTooltip-arrow': {
                                                                                         color: 'rgba(0, 0, 0, 0.9)', // Match arrow color
                                                                                     },
-                                                                                    color: '#7cdff8e3'
+                                                                                    color: '#7cdff8e3',
+                                                                                    textShadow: '0 0 8px rgba(124,244,248,.45)'
                                                                                 }
                                                                             }
                                                                         }}>
