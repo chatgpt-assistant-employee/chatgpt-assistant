@@ -696,7 +696,7 @@ function DashboardPage() {
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>
                         <StatCard title="Replies Sent" onClick={() => handleCardClick('total')}>
                             <FormControl variant="standard" size="small" sx={{ position: 'absolute', top: 24, right: 24, minWidth: 120, zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
-                                <Select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)} MenuProps={{ PaperProps: { sx: { bgcolor: 'background.paper', backgroundImage: 'none' }}}}>
+                                <Select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)} MenuProps={{ PaperProps: { sx: { bgcolor: 'background.mPaper', backgroundImage: 'none' }}}}>
                                     <MenuItem value="today">Today</MenuItem>
                                     <MenuItem value="week">Last 7 Days</MenuItem>
                                     <MenuItem value="4weeks">Last 4 Weeks</MenuItem>
@@ -742,7 +742,7 @@ function DashboardPage() {
                         <StatCard title="Peak Reply Hours" description="Based on all activity" descColor="#7cf4f8cc" onClick={() => handleCardClick('hourly')}>
                             {/* --- ADD THIS FILTER DROPDOWN --- */}
                             <FormControl variant="standard" size="small" sx={{ position: 'absolute', top: 24, right: 24, minWidth: 120, zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
-                                <Select value={hourlyTimeFilter} onChange={(e) => setHourlyTimeFilter(e.target.value)} MenuProps={{ PaperProps: { sx: { bgcolor: 'background.paper', backgroundImage: 'none' }}}}>
+                                <Select value={hourlyTimeFilter} onChange={(e) => setHourlyTimeFilter(e.target.value)} MenuProps={{ PaperProps: { sx: { bgcolor: 'background.mPaper', backgroundImage: 'none' }}}}>
                                     <MenuItem value="today">Today</MenuItem>
                                     <MenuItem value="week">Last 7 Days</MenuItem>
                                     <MenuItem value="4weeks">Last 4 Weeks</MenuItem>
@@ -755,9 +755,7 @@ function DashboardPage() {
 
                             {/* --- WRAP THE CHART IN A LOADER --- */}
                             {isHourlyChartLoading ? (
-                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%'}}>
                                     <CircularProgress />
-                                </Box>
                             ) : (
                                 <ResponsiveContainer width="100%" height={200}>
                                     <LineChart data={hourlyChartData} margin={{ top: 20, right: 20, left: -10, bottom: 0 }}>
@@ -774,7 +772,7 @@ function DashboardPage() {
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>
                         <StatCard title="Email Tracking" onClick={() => handleCardClick('engagement')}>
                             <FormControl variant="standard" size="small" sx={{ position: 'absolute', top: 24, right: 24, minWidth: 120, zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
-                                <Select value={trackingTimeFilter} onChange={(e) => setTrackingTimeFilter(e.target.value)} MenuProps={{ PaperProps: { sx: { bgcolor: 'background.paper', backgroundImage: 'none' }}}}>
+                                <Select value={trackingTimeFilter} onChange={(e) => setTrackingTimeFilter(e.target.value)} MenuProps={{ PaperProps: { sx: { bgcolor: 'background.mPaper', backgroundImage: 'none' }}}}>
                                     <MenuItem value="today">Today</MenuItem>
                                     <MenuItem value="week">Last 7 Days</MenuItem>
                                     <MenuItem value="month">Last 4 Weeks</MenuItem>
