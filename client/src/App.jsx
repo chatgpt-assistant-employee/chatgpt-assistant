@@ -23,6 +23,7 @@ import PaymentSuccessPage from './pages/PaymentSuccessPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import SMMPage from './pages/SMMPage';
 
 // This is a new, simple component to show to unverified users
 function UnverifiedPage({ userEmail }) {
@@ -95,6 +96,7 @@ function AppContent() {
                         <Route path="assistants" element={<AssistantsPage />} />
                         <Route path="assistant/:id" element={<AssistantDetailPage />} />
                         <Route path="chat" element={<ChatPage />} />
+                        <Route path="smm" element={<SMMPage />} />
                         <Route path="billing" element={<BillingPage />} />
                         <Route path="settings" element={<SettingsPage />} />
                         <Route path="*" element={<Navigate to="/" />} />

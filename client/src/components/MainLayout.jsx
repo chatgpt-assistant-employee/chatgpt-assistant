@@ -11,6 +11,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import ChatIcon from '@mui/icons-material/Chat';
+import CampaignIcon from '@mui/icons-material/Campaign';
 import PaymentIcon from '@mui/icons-material/Payment';
 import SettingsIcon from '@mui/icons-material/Settings';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -21,6 +22,7 @@ const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
   { text: 'Assistants', icon: <SmartToyIcon />, path: '/assistants' },
   { text: 'Chat', icon: <ChatIcon />, path: '/chat' },
+  { text: 'SMM', icon: <CampaignIcon />, path: '/smm' },
   { text: 'Billing', icon: <PaymentIcon />, path: '/billing' },
   { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
 ];
