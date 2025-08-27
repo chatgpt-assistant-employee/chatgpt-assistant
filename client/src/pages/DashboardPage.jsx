@@ -706,7 +706,6 @@ function DashboardPage() {
                                     <MenuItem value="all">All Time</MenuItem>
                                 </Select>
                             </FormControl>
-                            <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 {isFilterLoading ? (
                                     <CircularProgress />
                                 ) : (
@@ -714,7 +713,6 @@ function DashboardPage() {
                                         {filteredRepliesCount}
                                     </Typography>
                                 )}
-                            </Box>
                         </StatCard>
                     </Grid>
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>
