@@ -2377,7 +2377,21 @@ app.get('/api/threads/top', isVerified, async (req, res) => {
     try {
         const { assistantId, period, limit = 5 } = req.query;
         const assistant = await prisma.assistant.findFirst({ where: { id: assistantId, userId: req.session.userId } });
-        if (!assistant || !assistant.googleTokens) return res.status(403).json({ message: 'Permission denied or Gmail not connected.' });
+        
+        // --- NEW, MORE SPECIFIC ERROR CHECKING ---
+        if (!assistant) {
+            const assistantExists = await prisma.assistant.findUnique({ where: { id: assistantId } });
+            if (!assistantExists) {
+                return res.status(404).json({ message: 'Assistant not found.' });
+            } else {
+                return res.status(403).json({ message: 'You do not have permission to access this assistant.' });
+            }
+        }
+
+        if (!assistant.googleTokens) {
+            return res.status(403).json({ message: 'This assistant is not connected to a Gmail account.' });
+        }
+        // --- END OF NEW CHECKING ---
 
         const gmail = await getGmailClientAndPersist(assistant);
 
@@ -2442,7 +2456,21 @@ app.get('/api/thread/summary/:assistantId/:threadId', isVerified, async (req, re
     try {
         const { assistantId, threadId } = req.params;
         const assistant = await prisma.assistant.findFirst({ where: { id: assistantId, userId: req.session.userId } });
-        if (!assistant || !assistant.googleTokens) return res.status(403).json({ message: 'Permission denied.' });
+        
+        // --- NEW, MORE SPECIFIC ERROR CHECKING ---
+        if (!assistant) {
+            const assistantExists = await prisma.assistant.findUnique({ where: { id: assistantId } });
+            if (!assistantExists) {
+                return res.status(404).json({ message: 'Assistant not found.' });
+            } else {
+                return res.status(403).json({ message: 'You do not have permission to access this assistant.' });
+            }
+        }
+
+        if (!assistant.googleTokens) {
+            return res.status(403).json({ message: 'This assistant is not connected to a Gmail account.' });
+        }
+        // --- END OF NEW CHECKING ---
 
         const gmail = await getGmailClientAndPersist(assistant);
         const threadResponse = await gmail.users.threads.get({ userId: 'me', id: threadId });
