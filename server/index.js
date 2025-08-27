@@ -427,12 +427,33 @@ const createGoogleLoginClient = () =>
   );
 
 // This is a new middleware to protect routes from unverified users
-const isVerified = async (req, res, next) => {
+/* const isVerified = async (req, res, next) => {
     if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
     const user = await prisma.user.findUnique({ where: { id: req.session.userId } });
     if (!user.isVerified) {
         return res.status(403).json({ message: 'Please verify your email address to continue.' });
     }
+    next();
+}; */
+const isVerified = async (req, res, next) => {
+    console.log('=== isVerified middleware ===');
+    console.log('req.session:', req.session);
+    console.log('req.session.userId:', req.session.userId);
+    
+    if (!req.session.userId) {
+        console.log('isVerified: No session userId');
+        return res.status(401).json({ message: 'Not authenticated' });
+    }
+    
+    const user = await prisma.user.findUnique({ where: { id: req.session.userId } });
+    console.log('isVerified: User found:', user ? { id: user.id, email: user.email, isVerified: user.isVerified } : null);
+    
+    if (!user.isVerified) {
+        console.log('isVerified: User not verified');
+        return res.status(403).json({ message: 'Please verify your email address to continue.' });
+    }
+    
+    console.log('isVerified: Passed, calling next()');
     next();
 };
 
@@ -2487,6 +2508,13 @@ app.get('/api/threads/top', isVerified, async (req, res) => {
         console.error("=== ERROR in /api/threads/top ===:", error);
         res.status(500).json({ message: 'Failed to fetch top threads.' });
     }
+});
+
+app.get('/api/threads/top-test', async (req, res) => {
+    console.log('=== TEST ROUTE - No middleware ===');
+    console.log('req.session:', req.session);
+    console.log('req.query:', req.query);
+    res.json({ message: 'Test route reached', session: req.session, query: req.query });
 });
 
 app.get('/api/thread/summary/:assistantId/:threadId', isVerified, async (req, res) => {
