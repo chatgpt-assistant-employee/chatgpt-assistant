@@ -2375,31 +2375,40 @@ app.get('/api/threads/top', isVerified, async (req, res) => {
     if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
 
     try {
-        const { assistantId } = req.query;
+        const { assistantId } = req.query; // This is correct - it's in query params
 
-        // --- ADDED FOR DEBUGGING ---
+        // --- FIXED: Add validation for assistantId ---
+        if (!assistantId) {
+            return res.status(400).json({ message: 'assistantId is required' });
+        }
+
         console.log('--- Top Threads Request ---');
         console.log('Session User ID:', req.session.userId);
         console.log('Requested Assistant ID:', assistantId);
-        // ---------------------------
 
-        const assistant = await prisma.assistant.findFirst({ where: { id: assistantId, userId: req.session.userId } });
+        const assistant = await prisma.assistant.findFirst({ 
+            where: { 
+                id: assistantId, 
+                userId: req.session.userId 
+            } 
+        });
 
-        // --- ADDED FOR DEBUGGING ---
         console.log('Assistant found based on both IDs:', assistant ? `Yes, named '${assistant.name}'` : 'No');
-        // ---------------------------
 
         if (!assistant) {
             const assistantExists = await prisma.assistant.findUnique({ where: { id: assistantId } });
-            if (!assistantExists) return res.status(404).json({ message: 'Assistant not found.' });
+            if (!assistantExists) {
+                return res.status(404).json({ message: 'Assistant not found.' });
+            }
             return res.status(403).json({ message: 'You do not have permission to access this assistant.' });
         }
+
         if (!assistant.googleTokens) {
             return res.status(403).json({ message: 'This assistant is not connected to a Gmail account.' });
         }
 
+        // Rest of your existing code...
         const gmail = await getGmailClientAndPersist(assistant);
-        // ... rest of the function is unchanged ...
         const { period, limit = 5 } = req.query;
         let startDate;
         if (period && period !== 'all') {
