@@ -28,7 +28,8 @@ import {
     Collapse,
     Tooltip,
     Alert, // Added for ConversationRow
-    TextareaAutosize // Added for ConversationRow
+    TextareaAutosize, // Added for ConversationRow
+    Chip
 } from '@mui/material';
 import { 
     KeyboardArrowDown as KeyboardArrowDownIcon, 
@@ -37,7 +38,8 @@ import {
     FiberManualRecord as UnreadIcon,
     Refresh as RefreshIcon,
     AutoAwesome as AiIcon,
-    Send as SendIcon // Added for ConversationRow
+    Send as SendIcon, // Added for ConversationRow
+    Link as LinkIcon // Import LinkIcon
 } from '@mui/icons-material';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import AssistantPicker from '../components/AssistantPicker';
@@ -532,21 +534,31 @@ function DashboardPage() {
 
     useEffect(() => {
         if (!selectedAssistant) return;
+
+        const currentAssistant = assistants.find(a => a.id === selectedAssistant);
+        if (!currentAssistant?.googleTokens) {
+            setTop5Conversations([]); // Clear data if not connected
+            return;
+        }
+
         const fetchTopConversations = async () => {
             setIsTopConvoLoading(true);
             try {
                 const response = await fetch(`${import.meta.env.VITE_API_URL}/api/threads/top?assistantId=${selectedAssistant}&period=${topConvoFilter}&limit=5`, { credentials: 'include' });
                 if (response.ok) {
                     setTop5Conversations(await response.json());
+                } else {
+                    setTop5Conversations([]); // Clear on error
                 }
             } catch (error) {
                 console.error("Failed to fetch top conversations:", error);
+                setTop5Conversations([]);
             } finally {
                 setIsTopConvoLoading(false);
             }
         };
         fetchTopConversations();
-    }, [selectedAssistant, topConvoFilter]);
+    }, [selectedAssistant, topConvoFilter, assistants]); // Add assistants to dependency array
 
     // --- ADD THIS NEW HANDLER FOR HOVER SUMMARIES ---
     const handleThreadHover = async (threadId) => {
@@ -603,6 +615,20 @@ function DashboardPage() {
                 break;
             case 'topConvo':
                 title = 'Top 10 Conversations';
+                // Check for Gmail connection BEFORE opening the modal and fetching
+                if (!currentAssistant?.googleTokens) {
+                    content = (
+                        <Box sx={{ textAlign: 'center', py: 4 }}>
+                            <Typography>This feature requires a Gmail connection.</Typography>
+                            <Button component={RouterLink} to={`/assistant/${selectedAssistant}`} startIcon={<LinkIcon/>} sx={{mt: 2}} variant="outlined">Connect Gmail Now</Button>
+                        </Box>
+                    );
+                    setModalContent({ title, content });
+                    setModalOpen(true);
+                    return;
+                }
+
+                // Proceed with fetching if connected
                 setModalContent({ title, content: null });
                 setModalOpen(true);
                 setIsTopConvoModalLoading(true);
@@ -610,9 +636,12 @@ function DashboardPage() {
                     const response = await fetch(`${import.meta.env.VITE_API_URL}/api/threads/top?assistantId=${selectedAssistant}&period=${topConvoFilter}&limit=10`, { credentials: 'include' });
                     if (response.ok) {
                         setTop10Conversations(await response.json());
+                    } else {
+                        setTop10Conversations([]);
                     }
                 } catch (error) {
                     console.error("Failed to fetch top 10 conversations", error);
+                    setTop10Conversations([]);
                 } finally {
                     setIsTopConvoModalLoading(false);
                 }
@@ -685,6 +714,8 @@ function DashboardPage() {
         setModalOpen(true);
     };
 
+    const currentAssistant = assistants.find(a => a.id === selectedAssistant);
+
     return (
         <Box>
            <Box sx={{ mb: {sm: 2, lg: 5.7}, mt: {lg: 3}, textAlign: 'center', display: 'flex', flexDirection: 'column',justifyContent: 'center', position: { sm: 'relative', lg: 'relative'} }}>
@@ -754,7 +785,7 @@ function DashboardPage() {
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>
                         <StatCard title="Top Conversations" onClick={() => handleCardClick('topConvo')}>
                             <FormControl variant="standard" size="small" sx={{ position: 'absolute', top: 24, right: 24, minWidth: 120, zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
-                                <Select value={topConvoFilter} onChange={(e) => setTopConvoFilter(e.target.value)} MenuProps={{ PaperProps: { sx: { bgcolor: 'background.paper', backgroundImage: 'none' }}}}>
+                                <Select value={topConvoFilter} onChange={(e) => setTopConvoFilter(e.target.value)} MenuProps={{ PaperProps: { sx: { bgcolor: 'background.paper', backgroundImage: 'none' }}}} disabled={!currentAssistant?.googleTokens}>
                                     <MenuItem value="today">Today</MenuItem>
                                     <MenuItem value="week">Last 7 Days</MenuItem>
                                     <MenuItem value="4weeks">Last 4 Weeks</MenuItem>
@@ -764,25 +795,26 @@ function DashboardPage() {
                                     <MenuItem value="all">All Time</MenuItem>
                                 </Select>
                             </FormControl>
-                            {isTopConvoLoading ? (
+                            
+                            {!currentAssistant?.googleTokens ? (
+                                <Box sx={{ textAlign: 'center' }}>
+                                    <Typography>Connect to Gmail to view top conversations.</Typography>
+                                    <Button component={RouterLink} to={`/assistant/${selectedAssistant}`} startIcon={<LinkIcon/>} sx={{mt: 2}} variant="outlined">Connect Now</Button>
+                                </Box>
+                            ) : isTopConvoLoading ? (
                                 <CircularProgress />
-                            ) : (
+                            ) : top5Conversations.length > 0 ? (
                                 <List sx={{ width: '100%' }}>
                                     {top5Conversations.map(convo => (
                                         <Tooltip key={convo.id} title={summaryCache[convo.id] || "Hover to load summary..."} placement="top" arrow onOpen={() => handleThreadHover(convo.id)}>
-                                            <ListItem disablePadding secondaryAction={
-                                                <Typography variant="body2" color="text.secondary">{convo.messageCount}</Typography>
-                                            }>
-                                                <ListItemText 
-                                                    primary={convo.subject || "(No Subject)"}
-                                                    secondary={convo.from}
-                                                    primaryTypographyProps={{ noWrap: true, fontWeight: 500 }}
-                                                    secondaryTypographyProps={{ noWrap: true }}
-                                                />
+                                            <ListItem disablePadding secondaryAction={ <Typography variant="body2" color="text.secondary">{convo.messageCount}</Typography> }>
+                                                <ListItemText primary={convo.subject || "(No Subject)"} secondary={convo.from} primaryTypographyProps={{ noWrap: true, fontWeight: 500 }} secondaryTypographyProps={{ noWrap: true }} />
                                             </ListItem>
                                         </Tooltip>
                                     ))}
                                 </List>
+                            ) : (
+                                <Typography color="text.secondary">No conversations found for this period.</Typography>
                             )}
                         </StatCard>
                     </Grid>
