@@ -319,7 +319,10 @@ const StatCard = ({ title, value, description, children, onClick, titleColor = '
                 {title}
             </Typography>
             {children ? (
-                <Box sx={{ flexGrow: 1, pt: 1 }}>{children}</Box>
+                // --- THIS IS THE CORRECTED LINE ---
+                <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {children}
+                </Box>
             ) : (
                 <>
                     <Typography 
