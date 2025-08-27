@@ -842,7 +842,21 @@ function DashboardPage() {
                                 <Box sx={{ width: '100%', py: 2, height: '100%', overflow: 'hidden' }}>
                                     <List sx={{ width: '100%', p: 0 }}>
                                         {top5Conversations.map(convo => (
-                                            <Tooltip key={convo.id} title={summaryCache[convo.id] || "Hover to load summary..."} placement="top" arrow onOpen={() => handleThreadHover(convo.id)}>
+                                            <Tooltip key={convo.id} title={summaryCache[convo.id] || "Hover to load summary..."} placement="top" arrow onOpen={() => handleThreadHover(convo.id)} componentsProps={{
+                                                                            tooltip: {
+                                                                                sx: {
+                                                                                    fontSize: '14px',        // Increase font size
+                                                                                    padding: '12px 16px',    // Add more padding
+                                                                                    maxWidth: '300px',       // Make tooltip wider
+                                                                                    lineHeight: 1.4,        // Better line spacing
+                                                                                    borderRadius: '8px',     // Rounded corners
+                                                                                    backgroundColor: 'rgba(0, 0, 0, 0.9)', // Custom background
+                                                                                    '& .MuiTooltip-arrow': {
+                                                                                        color: 'rgba(0, 0, 0, 0.9)', // Match arrow color
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        }}>
                                                 <ListItem 
                                                     sx={{ 
                                                         px: 0, 
