@@ -1960,49 +1960,60 @@ app.delete('/api/assistant/:id', isVerified, async (req, res) => {
     if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
     
     try {
-        const { id } = req.params; // This is the ID from our database
+        const { id } = req.params;
         const assistantInDb = await prisma.assistant.findUnique({ where: { id: id } });
 
-        // Security Check: Make sure the logged-in user owns this assistant
         if (!assistantInDb || assistantInDb.userId !== req.session.userId) {
             return res.status(403).json({ message: 'Permission denied.' });
         }
         
         const openaiAssistantId = assistantInDb.openaiAssistantId;
 
-        // --- NEW: FULL CLEANUP LOGIC FOR OPENAI ---
         try {
-            // 1. Retrieve the assistant from OpenAI to find its resources
-            const assistant = await openai.beta.assistants.retrieve(openaiAssistantId);
+            // 1. Retrieve the assistant from OpenAI using helper
+            const assistant = await asstRetrieve(openaiAssistantId);
             
             // 2. Find the attached Vector Store ID
             const vectorStoreId = assistant.tool_resources?.file_search?.vector_store_ids?.[0];
 
             if (vectorStoreId) {
                 console.log(`Found Vector Store ${vectorStoreId} to delete.`);
+                
                 // 3. List and delete all files within the Vector Store
-                const vectorStoreFiles = await openai.beta.vectorStores.files.list(vectorStoreId);
-                for (const file of vectorStoreFiles.data) {
-                    await openai.beta.vectorStores.files.del(vectorStoreId, file.id);
-                    await openai.files.del(file.id); // Also delete the file object itself
-                    console.log(`Deleted file ${file.id} from Vector Store.`);
+                try {
+                    const vectorStoreFiles = await vsFilesList(vectorStoreId);
+                    for (const file of vectorStoreFiles.data || []) {
+                        try {
+                            await vsFilesDel(vectorStoreId, file.id);
+                            await filesDel(file.id);
+                            console.log(`Deleted file ${file.id} from Vector Store.`);
+                        } catch (fileErr) {
+                            console.warn(`Could not delete file ${file.id}:`, fileErr.message);
+                        }
+                    }
+                } catch (listErr) {
+                    console.warn(`Could not list vector store files:`, listErr.message);
                 }
                 
                 // 4. Delete the Vector Store itself
-                await openai.beta.vectorStores.del(vectorStoreId);
-                console.log(`Deleted Vector Store ${vectorStoreId}.`);
+                try {
+                    await vsDel(vectorStoreId);
+                    console.log(`Deleted Vector Store ${vectorStoreId}.`);
+                } catch (vsErr) {
+                    console.warn(`Could not delete vector store:`, vsErr.message);
+                }
             }
             
-            // 5. Now, safely delete the assistant from OpenAI
-            await openai.beta.assistants.del(openaiAssistantId);
+            // 5. Delete the assistant from OpenAI using helper
+            await asstDel(openaiAssistantId);
             console.log(`Assistant ${openaiAssistantId} deleted from OpenAI.`);
 
         } catch (oaiError) {
-            // If the assistant doesn't exist on OpenAI for some reason, log it but don't stop.
-            console.error(`Could not fully clean up assistant ${openaiAssistantId} on OpenAI, it might have been deleted already. Error: ${oaiError.message}`);
+            console.error(`Could not fully clean up assistant ${openaiAssistantId} on OpenAI:`, oaiError.message);
+            // Continue with database deletion even if OpenAI cleanup fails
         }
         
-        // 6. Finally, delete the assistant from our database
+        // 6. Delete the assistant from our database
         await prisma.assistant.delete({ where: { id: id } });
         console.log(`Assistant ${id} deleted from our database.`);
 
