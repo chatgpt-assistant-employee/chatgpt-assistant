@@ -173,8 +173,19 @@ const asstRetrieve = (id) => {
   return ns.retrieve(id);
 };
 const asstDel = (id) => {
-  const ns = asstNS(); if (!ns?.del) throw new Error('assistants.del missing.');
-  return ns.del(id);
+  const ns = asstNS(); 
+  if (!ns) throw new Error('assistants namespace missing.');
+  
+  // Try multiple possible method names
+  const methods = ['delete', 'del', 'remove', 'destroy'];
+  
+  for (const methodName of methods) {
+    if (typeof ns[methodName] === 'function') {
+      return ns[methodName](id);
+    }
+  }
+  
+  throw new Error('No delete method found in assistants namespace');
 };
 
 // Threads (you also use beta.threads.messages.list elsewhere)
