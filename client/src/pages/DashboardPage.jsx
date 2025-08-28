@@ -855,11 +855,11 @@ function DashboardPage() {
                             <FormControl variant="standard" size="small" sx={{ position: 'absolute', top: 24, right: 24, minWidth: 120, zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
                                 <Select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)} MenuProps={{ PaperProps: { sx: { bgcolor: 'background.mPaper', backgroundImage: 'none' }}}}>
                                     <MenuItem value="today">Today</MenuItem>
-                                    <MenuItem value="week">Last 7 Days</MenuItem>
-                                    <MenuItem value="4weeks">Last 4 Weeks</MenuItem>
-                                    <MenuItem value="3months">Last 3 Months</MenuItem>
-                                    <MenuItem value="6months">Last 6 Months</MenuItem>
-                                    <MenuItem value="year">Last Year</MenuItem>
+                                    <MenuItem value="week">7 Days</MenuItem>
+                                    <MenuItem value="4weeks">4 Weeks</MenuItem>
+                                    <MenuItem value="3months">3 Months</MenuItem>
+                                    <MenuItem value="6months">6 Months</MenuItem>
+                                    <MenuItem value="year">1 Year</MenuItem>
                                     <MenuItem value="all">All Time</MenuItem>
                                 </Select>
                             </FormControl>
@@ -932,7 +932,7 @@ function DashboardPage() {
                                                     })()}
                                                 </Box>
                                                 <Typography variant="caption" color="text.secondary">
-                                                    vs prev period
+                                                    vs {getPreviousPeriodLabel(timeFilter).toLowerCase()}
                                                 </Typography>
                                             </Box>
                                         </Box>
@@ -948,7 +948,9 @@ function DashboardPage() {
                                         borderTop: '1px solid rgba(124,244,248,0.1)'
                                     }}>
                                         <Box sx={{ textAlign: 'center' }}>
-                                            <Typography variant="caption" color="text.secondary">Previous</Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                {getPreviousPeriodLabel(timeFilter) || 'Previous'}
+                                            </Typography>
                                             <Typography variant="body2" color="primary.main" sx={{ fontWeight: 500 }}>
                                                 {isComparisonLoading ? '...' : previousPeriodCount}
                                             </Typography>
