@@ -679,6 +679,27 @@ function DashboardPage() {
         }
     };
 
+    const getPreviousPeriodLabel = (currentPeriod) => {
+        switch (currentPeriod) {
+            case 'today':
+                return 'Yesterday';
+            case 'week':
+                return 'Prev 7 days';
+            case '4weeks':
+                return 'Prev 4 weeks';
+            case '3months':
+                return 'Prev 3 months';
+            case '6months':
+                return 'Prev 6 months';
+            case 'year':
+                return 'Prev year';
+            case 'all':
+                return null;
+            default:
+                return 'Previous';
+        }
+    };
+
     const emailTrackingData = [
         { name: 'Opened', value: filteredTrackingStats?.totalOpened ?? 0 },
         { name: 'Unopened', value: (filteredTrackingStats?.totalSent ?? 0) - (filteredTrackingStats?.totalOpened ?? 0) },
