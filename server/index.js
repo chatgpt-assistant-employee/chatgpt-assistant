@@ -861,62 +861,123 @@ app.get('/api/threads/top', isVerified, async (req, res) => {
             return res.status(403).json({ message: 'This assistant is not connected to a Gmail account.' });
         }
 
-        const gmail = await getGmailClientAndPersist(assistant);
-        const { period, limit = 5 } = req.query;
-        
-        let startDate;
-        if (period && period !== 'all') {
-            const now = new Date();
-            switch (period) {
-                case 'today': startDate = new Date(new Date().setHours(0, 0, 0, 0)); break;
-                case 'week': startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
-                case '4weeks': startDate = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000); break;
-                case '3months': startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()); break;
-                case '6months': startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate()); break;
-                case 'year': startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()); break;
-            }
-        }
-
-        const listRes = await gmail.users.threads.list({ userId: 'me', maxResults: 30, q: 'is:inbox' });
-        if (!listRes.data.threads) return res.json([]);
-
-        let threadsWithDetails = await Promise.all(
-            listRes.data.threads.map(async (t) => {
-                try {
-                    const details = await gmail.users.threads.get({ userId: 'me', id: t.id, format: 'metadata', metadataHeaders: ['Subject', 'From', 'Date'] });
-                    const messages = details.data.messages;
-                    const lastMessage = messages[messages.length - 1];
-                    const lastMessageDate = new Date(parseInt(lastMessage.internalDate, 10));
-                    
-                    if (startDate && lastMessageDate < startDate) return null;
-                    
-                    // Find the first message that's NOT from the assistant to get the recipient's email
-                    let recipientEmail = '';
-                    for (const msg of messages) {
-                        const fromHeader = msg.payload.headers.find(h => h.name === 'From')?.value || '';
-                        if (!fromHeader.includes(assistant.emailAddress)) {
-                            recipientEmail = fromHeader.split('<')[0].trim();
-                            break;
-                        }
-                    }
-                    
-                    const hdrs = lastMessage.payload.headers;
-                    const subject = hdrs.find(h => h.name === 'Subject')?.value || '';
-                    
-                    return { 
-                        id: t.id, 
-                        subject: subject, 
-                        from: recipientEmail || hdrs.find(h => h.name === 'From')?.value?.split('<')[0]?.trim() || '', 
-                        messageCount: messages.length 
-                    };
-                } catch (error) { 
-                    return null; 
+        try {
+            const gmail = await getGmailClientAndPersist(assistant);
+            const { period, limit = 5 } = req.query;
+            
+            let startDate;
+            if (period && period !== 'all') {
+                const now = new Date();
+                switch (period) {
+                    case 'today': 
+                        startDate = new Date(new Date().setHours(0, 0, 0, 0)); 
+                        break;
+                    case 'week': 
+                        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); 
+                        break;
+                    case '4weeks': 
+                        startDate = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000); 
+                        break;
+                    case '3months': 
+                        startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()); 
+                        break;
+                    case '6months': 
+                        startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate()); 
+                        break;
+                    case 'year': 
+                        startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()); 
+                        break;
                 }
-            })
-        );
+            }
 
-        const sortedThreads = threadsWithDetails.filter(Boolean).sort((a, b) => b.messageCount - a.messageCount).slice(0, parseInt(limit, 10));
-        res.json(sortedThreads);
+            const listRes = await gmail.users.threads.list({ 
+                userId: 'me', 
+                maxResults: 30, 
+                q: 'is:inbox' 
+            });
+            
+            if (!listRes.data.threads) return res.json([]);
+
+            let threadsWithDetails = await Promise.all(
+                listRes.data.threads.map(async (t) => {
+                    try {
+                        const details = await gmail.users.threads.get({ 
+                            userId: 'me', 
+                            id: t.id, 
+                            format: 'metadata', 
+                            metadataHeaders: ['Subject', 'From', 'Date'] 
+                        });
+                        
+                        const messages = details.data.messages;
+                        const lastMessage = messages[messages.length - 1];
+                        const lastMessageDate = new Date(parseInt(lastMessage.internalDate, 10));
+                        
+                        if (startDate && lastMessageDate < startDate) return null;
+                        
+                        // Find the first message that's NOT from the assistant to get the recipient's email
+                        let recipientEmail = '';
+                        for (const msg of messages) {
+                            const fromHeader = msg.payload.headers.find(h => h.name === 'From')?.value || '';
+                            if (!fromHeader.includes(assistant.emailAddress)) {
+                                recipientEmail = fromHeader.split('<')[0].trim();
+                                break;
+                            }
+                        }
+                        
+                        const hdrs = lastMessage.payload.headers;
+                        const subject = hdrs.find(h => h.name === 'Subject')?.value || '';
+                        
+                        return { 
+                            id: t.id, 
+                            subject: subject, 
+                            from: recipientEmail || hdrs.find(h => h.name === 'From')?.value?.split('<')[0]?.trim() || '', 
+                            messageCount: messages.length 
+                        };
+                    } catch (error) { 
+                        console.error(`Error processing thread ${t.id}:`, error);
+                        return null; 
+                    }
+                })
+            );
+
+            const sortedThreads = threadsWithDetails
+                .filter(Boolean)
+                .sort((a, b) => b.messageCount - a.messageCount)
+                .slice(0, parseInt(limit, 10));
+                
+            res.json(sortedThreads);
+
+        } catch (authError) {
+            // Check if it's a token expiration error
+            if (authError.message?.includes('invalid_grant') || 
+                authError.code === 401 || 
+                authError.status === 401 ||
+                authError.response?.data?.error === 'invalid_grant') {
+                
+                console.log('Gmail tokens expired for assistant:', assistantId);
+                
+                // Clear the expired tokens
+                await prisma.assistant.update({
+                    where: { id: assistantId },
+                    data: { googleTokens: null }
+                });
+                
+                return res.status(401).json({ 
+                    message: 'Gmail authentication expired. Please reconnect your Gmail account.',
+                    authExpired: true
+                });
+            }
+            
+            // For other auth-related errors
+            if (authError.code === 403 || authError.status === 403) {
+                return res.status(403).json({
+                    message: 'Gmail access forbidden. Please check your account permissions.',
+                    authError: true
+                });
+            }
+            
+            throw authError; // Re-throw other errors
+        }
 
     } catch (error) {
         console.error("Error fetching top threads:", error);

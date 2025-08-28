@@ -584,10 +584,19 @@ function DashboardPage() {
             setIsTopConvoLoading(true);
             try {
                 const response = await fetch(`${import.meta.env.VITE_API_URL}/api/threads/top?assistantId=${selectedAssistant}&period=${topConvoFilter}&limit=5`, { credentials: 'include' });
+                
                 if (response.ok) {
                     setTop5Conversations(await response.json());
+                } else if (response.status === 401) {
+                    const errorData = await response.json();
+                    if (errorData.authExpired) {
+                        console.log('Gmail auth expired, clearing conversations');
+                        setTop5Conversations([]);
+                        // Optionally show a notification to the user
+                        // You could set a state to show "Please reconnect Gmail" message
+                    }
                 } else {
-                    setTop5Conversations([]); // Clear on error
+                    setTop5Conversations([]);
                 }
             } catch (error) {
                 console.error("Failed to fetch top conversations:", error);
@@ -1003,8 +1012,15 @@ function DashboardPage() {
                             
                             {!currentAssistant?.googleTokens ? (
                                 <Box sx={{ textAlign: 'center', py: 4 }}>
-                                    <Typography>Connect to Gmail to view top conversations.</Typography>
-                                    <Button component={Link} to={`/assistant/${selectedAssistant}`} startIcon={<LinkIcon/>} sx={{mt: 2}} variant="outlined">Connect Now</Button>
+                                    <Typography sx={{ mb: 1 }}>
+                                        {top5Conversations.length === 0 && !isTopConvoLoading ? 
+                                            'Gmail connection expired. Please reconnect.' : 
+                                            'Connect to Gmail to view top conversations.'
+                                        }
+                                    </Typography>
+                                    <Button component={Link} to={`/assistant/${selectedAssistant}`} startIcon={<LinkIcon/>} sx={{mt: 2}} variant="outlined">
+                                        {top5Conversations.length === 0 && !isTopConvoLoading ? 'Reconnect Gmail' : 'Connect Now'}
+                                    </Button>
                                 </Box>
                             ) : isTopConvoLoading ? (
                                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
