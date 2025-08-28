@@ -2512,6 +2512,7 @@ app.get('/api/thread/summary/:assistantId/:threadId', isVerified, async (req, re
     }
 });
 
+
 // GET FULL CONTENT of a specific thread
 app.get('/api/thread/:assistantId/:threadId', isVerified, async (req, res) => {
     if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
@@ -3087,6 +3088,68 @@ app.get('/api/stats/tracking/:assistantId', isVerified, async (req, res) => {
     } catch (error) {
         console.error("Error fetching tracking stats:", error);
         res.status(500).json({ message: "Failed to fetch tracking stats." });
+    }
+});
+
+app.get('/api/stats/comparison/:assistantId', isVerified, async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
+
+    try {
+        const { assistantId } = req.params;
+        const { period } = req.query;
+        
+        const assistant = await prisma.assistant.findFirst({
+            where: { id: assistantId, userId: req.session.userId }
+        });
+        if (!assistant) return res.status(403).json({ message: 'Permission denied.' });
+
+        let startDate, endDate;
+        const now = new Date();
+
+        switch (period) {
+            case 'yesterday':
+                startDate = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000); // 2 days ago
+                endDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 1 day ago
+                break;
+            case 'prev_week':
+                startDate = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000); // 14 days ago
+                endDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+                break;
+            case 'prev_4weeks':
+                startDate = new Date(now.getTime() - 56 * 24 * 60 * 60 * 1000); // 56 days ago
+                endDate = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000); // 28 days ago
+                break;
+            case 'prev_3months':
+                startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate()); // 6 months ago
+                endDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()); // 3 months ago
+                break;
+            case 'prev_6months':
+                startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()); // 1 year ago
+                endDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate()); // 6 months ago
+                break;
+            case 'prev_year':
+                startDate = new Date(now.getFullYear() - 2, now.getMonth(), now.getDate()); // 2 years ago
+                endDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()); // 1 year ago
+                break;
+            default:
+                return res.status(400).json({ message: 'Invalid comparison period' });
+        }
+
+        const count = await prisma.emailLog.count({
+            where: {
+                assistantId,
+                createdAt: {
+                    gte: startDate,
+                    lte: endDate
+                }
+            }
+        });
+
+        res.json({ count });
+
+    } catch (error) {
+        console.error("Error fetching comparison stats:", error);
+        res.status(500).json({ message: "Failed to fetch comparison stats." });
     }
 });
 

@@ -426,6 +426,8 @@ function DashboardPage() {
     const [selectedThreadSubject, setSelectedThreadSubject] = useState('');
     const [isThreadDetailsLoading, setIsThreadDetailsLoading] = useState(false);
     const [showThreadDetails, setShowThreadDetails] = useState(false);
+    const [previousPeriodCount, setPreviousPeriodCount] = useState(0);
+    const [isComparisonLoading, setIsComparisonLoading] = useState(false);
 
     // Fetch assistants
     useEffect(() => {
@@ -485,21 +487,48 @@ function DashboardPage() {
     // Fetch filtered replies
     useEffect(() => {
         if (!selectedAssistant) return;
+        
         const fetchFilteredReplies = async () => {
             setIsFilterLoading(true);
+            setIsComparisonLoading(true);
+            
             try {
-                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stats/${selectedAssistant}?period=${timeFilter}`, { credentials: 'include' });
-                if (response.ok) {
-                    const data = await response.json();
-                    setFilteredRepliesCount(data.count);
+                // Fetch current period
+                const currentResponse = await fetch(
+                    `${import.meta.env.VITE_API_URL}/api/stats/${selectedAssistant}?period=${timeFilter}`, 
+                    { credentials: 'include' }
+                );
+                if (currentResponse.ok) {
+                    const currentData = await currentResponse.json();
+                    setFilteredRepliesCount(currentData.count);
+                }
+                
+                // Fetch previous period for comparison
+                const previousPeriod = getPreviousPeriodFilter(timeFilter);
+                if (previousPeriod) {
+                    const previousResponse = await fetch(
+                        `${import.meta.env.VITE_API_URL}/api/stats/comparison/${selectedAssistant}?period=${previousPeriod}`, 
+                        { credentials: 'include' }
+                    );
+                    if (previousResponse.ok) {
+                        const previousData = await previousResponse.json();
+                        setPreviousPeriodCount(previousData.count);
+                    } else {
+                        setPreviousPeriodCount(0);
+                    }
+                } else {
+                    setPreviousPeriodCount(0);
                 }
             } catch (error) {
                 console.error("Failed to fetch filtered replies:", error);
                 setFilteredRepliesCount(0);
+                setPreviousPeriodCount(0);
             } finally {
                 setIsFilterLoading(false);
+                setIsComparisonLoading(false);
             }
         };
+        
         fetchFilteredReplies();
     }, [selectedAssistant, timeFilter]);
 
@@ -619,6 +648,34 @@ function DashboardPage() {
             console.error("Failed to fetch threads:", e);
         } finally {
             setIsThreadsLoading(false);
+        }
+    };
+
+    const getPreviousPeriodFilter = (currentPeriod) => {
+        const now = new Date();
+        let startDate, endDate;
+        
+        switch (currentPeriod) {
+            case 'today':
+                startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                endDate = new Date(now.setHours(0, 0, 0, 0));
+                return { period: 'custom', startDate, endDate };
+            case 'week':
+                startDate = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+                endDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                return { period: 'custom', startDate, endDate };
+            case '4weeks':
+                return 'week'; // Compare current 4 weeks to previous week
+            case '3months':
+                return '4weeks'; // Compare current 3 months to previous 4 weeks
+            case '6months':
+                return '3months';
+            case 'year':
+                return '6months';
+            case 'all':
+                return 'year';
+            default:
+                return 'week';
         }
     };
 
@@ -806,13 +863,105 @@ function DashboardPage() {
                                     <MenuItem value="all">All Time</MenuItem>
                                 </Select>
                             </FormControl>
-                                {isFilterLoading ? (
-                                    <CircularProgress />
-                                ) : (
-                                    <Typography component="p" variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '2.5rem', sm: '3rem' }, color: 'primary.main', textShadow: '0 0 8px rgba(124,244,248,.45)' }}>
+                            
+                            {isFilterLoading ? (
+                                <CircularProgress />
+                            ) : (
+                                <Box sx={{ textAlign: 'center', width: '100%' }}>
+                                    {/* Main Number */}
+                                    <Typography component="p" variant="h4" fontWeight="bold" sx={{ 
+                                        fontSize: { xs: '2.5rem', sm: '3rem' }, 
+                                        color: 'primary.main', 
+                                        textShadow: '0 0 8px rgba(124,244,248,.45)',
+                                        mb: 2
+                                    }}>
                                         {filteredRepliesCount}
                                     </Typography>
-                                )}
+                                    
+                                    {/* Comparison Section */}
+                                    {!isComparisonLoading && timeFilter !== 'all' && previousPeriodCount > 0 && (
+                                        <Box sx={{ 
+                                            display: 'flex', 
+                                            justifyContent: 'center', 
+                                            alignItems: 'center',
+                                            gap: 2,
+                                            mb: 2
+                                        }}>
+                                            {/* Mini Bar Chart */}
+                                            <Box sx={{ display: 'flex', alignItems: 'end', gap: 0.5, height: '40px' }}>
+                                                {/* Previous period bar */}
+                                                <Box sx={{
+                                                    width: '12px',
+                                                    height: `${Math.min((previousPeriodCount / Math.max(filteredRepliesCount, previousPeriodCount)) * 35, 35)}px`,
+                                                    backgroundColor: 'text.secondary',
+                                                    borderRadius: '2px 2px 0 0',
+                                                    opacity: 0.7
+                                                }} />
+                                                {/* Current period bar */}
+                                                <Box sx={{
+                                                    width: '12px',
+                                                    height: `${Math.min((filteredRepliesCount / Math.max(filteredRepliesCount, previousPeriodCount)) * 35, 35)}px`,
+                                                    backgroundColor: 'primary.main',
+                                                    borderRadius: '2px 2px 0 0',
+                                                    boxShadow: '0 0 4px rgba(124,244,248,.3)'
+                                                }} />
+                                            </Box>
+                                            
+                                            {/* Percentage Change */}
+                                            <Box sx={{ textAlign: 'left' }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                    {(() => {
+                                                        const change = previousPeriodCount > 0 
+                                                            ? ((filteredRepliesCount - previousPeriodCount) / previousPeriodCount * 100)
+                                                            : filteredRepliesCount > 0 ? 100 : 0;
+                                                        const isPositive = change >= 0;
+                                                        
+                                                        return (
+                                                            <>
+                                                                <Typography 
+                                                                    variant="h6" 
+                                                                    sx={{ 
+                                                                        color: isPositive ? 'success.main' : 'error.main',
+                                                                        fontWeight: 600
+                                                                    }}
+                                                                >
+                                                                    {isPositive ? '↑' : '↓'} {Math.abs(change).toFixed(0)}%
+                                                                </Typography>
+                                                            </>
+                                                        );
+                                                    })()}
+                                                </Box>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    vs prev period
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                    )}
+                                    
+                                    {/* Bottom Stats */}
+                                    <Box sx={{ 
+                                        display: 'flex', 
+                                        justifyContent: 'space-between', 
+                                        alignItems: 'center',
+                                        px: 1,
+                                        pt: 1,
+                                        borderTop: '1px solid rgba(124,244,248,0.1)'
+                                    }}>
+                                        <Box sx={{ textAlign: 'center' }}>
+                                            <Typography variant="caption" color="text.secondary">Previous</Typography>
+                                            <Typography variant="body2" color="primary.main" sx={{ fontWeight: 500 }}>
+                                                {isComparisonLoading ? '...' : previousPeriodCount}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ textAlign: 'center' }}>
+                                            <Typography variant="caption" color="text.secondary">All Time</Typography>
+                                            <Typography variant="body2" color="primary.main" sx={{ fontWeight: 500 }}>
+                                                {stats?.totalEmailsHandled ?? 0}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </Box>
+                            )}
                         </StatCard>
                     </Grid>
                     <Grid item xs={12} sm={6} lg={4} sx={{ display: 'flex' }}>
