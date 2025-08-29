@@ -1187,39 +1187,98 @@ function DashboardPage() {
                                     <CircularProgress />
                                 </Box>
                             ) : (
-                                <Grid container spacing={2} alignItems="center" sx={{height: '100%'}}>
-                                    <Grid item xs={12} md={4}>
-                                        <Box sx={{ height: 200 }}>
-                                            <ResponsiveContainer>
-                                                <PieChart>
-                                                    <Pie data={emailTrackingData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={70} >
-                                                        {emailTrackingData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
-                                                    </Pie>
-                                                    <RechartsTooltip />
-                                                </PieChart>
-                                            </ResponsiveContainer>
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', py: 2 }}>
+                                    {/* Central Pie Chart */}
+                                    <Box sx={{ position: 'relative', mb: 2 }}>
+                                        <ResponsiveContainer width={140} height={140}>
+                                            <PieChart>
+                                                <Pie 
+                                                    data={emailTrackingData} 
+                                                    dataKey="value" 
+                                                    nameKey="name" 
+                                                    cx="50%" 
+                                                    cy="50%" 
+                                                    innerRadius={35}
+                                                    outerRadius={60}
+                                                    startAngle={90}
+                                                    endAngle={450}
+                                                >
+                                                    {emailTrackingData.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                    ))}
+                                                </Pie>
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                        
+                                        {/* Percentage in center of pie chart */}
+                                        <Box sx={{
+                                            position: 'absolute',
+                                            top: '50%',
+                                            left: '50%',
+                                            transform: 'translate(-50%, -50%)',
+                                            textAlign: 'center'
+                                        }}>
+                                            <Typography variant="h4" fontWeight="bold" sx={{ 
+                                                color: 'primary.main',
+                                                textShadow: '0 0 8px rgba(124,244,248,.45)',
+                                                lineHeight: 1
+                                            }}>
+                                                {filteredTrackingStats?.openRate ?? 0}%
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                                                Open Rate
+                                            </Typography>
                                         </Box>
+                                    </Box>
+
+                                    {/* Stats Grid Below */}
+                                    <Grid container spacing={1} sx={{ width: '100%', px: 1 }}>
+                                        <Grid item xs={12} sm={4}>
+                                            <Box sx={{ textAlign: 'center' }}>
+                                                <Typography variant="h6" fontWeight="bold" color="primary.main">
+                                                    {filteredTrackingStats?.totalOpened ?? 0} / {filteredTrackingStats?.totalSent ?? 0}
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Total Opened
+                                                </Typography>
+                                            </Box>
+                                        </Grid>
+                                        
+                                        <Grid item xs={6} sm={4}>
+                                            <Box sx={{ textAlign: 'center' }}>
+                                                <Typography variant="h6" fontWeight="bold" color="success.main">
+                                                    {filteredTrackingStats?.regularOpened ?? 0}
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Regular
+                                                </Typography>
+                                            </Box>
+                                        </Grid>
+                                        
+                                        <Grid item xs={6} sm={4}>
+                                            <Box sx={{ textAlign: 'center' }}>
+                                                <Typography variant="h6" fontWeight="bold" color="info.main">
+                                                    {filteredTrackingStats?.followUpsOpened ?? 0}
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Follow-ups
+                                                </Typography>
+                                            </Box>
+                                        </Grid>
                                     </Grid>
-                                    <Grid item xs={12} md={4} sx={{ textAlign: 'center' }}>
-                                         <Typography variant="h2" fontWeight="bold">{filteredTrackingStats?.openRate ?? 0}%</Typography>
-                                         <Typography color="text.secondary" variant="h6">Open Rate</Typography>
-                                    </Grid>
-                                    <Grid item xs={12} md={4}>
-                                        <List>
-                                            <ListItem>
-                                                <ListItemText primary={<Typography fontWeight="bold">{filteredTrackingStats?.totalOpened ?? 0} / {filteredTrackingStats?.totalSent ?? 0}</Typography>} secondary="Total Opened" />
-                                            </ListItem>
-                                            <Divider component="li" />
-                                            <ListItem>
-                                                <ListItemText primary={<Typography fontWeight="bold">{filteredTrackingStats?.regularOpened ?? 0}</Typography>} secondary="Regular Opened" />
-                                            </ListItem>
-                                            <Divider component="li" />
-                                            <ListItem>
-                                                <ListItemText primary={<Typography fontWeight="bold">{filteredTrackingStats?.followUpsOpened ?? 0}</Typography>} secondary="Follow-ups Opened" />
-                                            </ListItem>
-                                        </List>
-                                    </Grid>
-                                </Grid>
+
+                                    {/* Legend */}
+                                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 1 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            <Box sx={{ width: 12, height: 12, bgcolor: COLORS[0], borderRadius: '50%' }} />
+                                            <Typography variant="caption" color="text.secondary">Opened</Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            <Box sx={{ width: 12, height: 12, bgcolor: COLORS[1], borderRadius: '50%' }} />
+                                            <Typography variant="caption" color="text.secondary">Unopened</Typography>
+                                        </Box>
+                                    </Box>
+                                </Box>
                             )}
                         </StatCard>
                     </Grid>
