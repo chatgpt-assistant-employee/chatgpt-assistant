@@ -132,6 +132,15 @@ function AuthPage({ onLoginSuccess }) {
           </Typography>
         </Box>
       </Paper>
+      <Box sx={{ mt: 4, display: 'flex', gap: 3, alignItems: 'center' }}>
+            <Link href="https://www.chatgptassistants.com/blank-2" target="_blank" rel="noopener noreferrer" variant="body2" color="text.secondary">
+                Terms & Conditions
+            </Link>
+            <Typography color="text.secondary">|</Typography>
+            <Link href="https://www.chatgptassistants.com/blank" target="_blank" rel="noopener noreferrer" variant="body2" color="text.secondary">
+                Privacy Policy
+            </Link>
+        </Box>
     </Box>
   );
 }
