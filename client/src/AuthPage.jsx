@@ -57,7 +57,7 @@ function AuthPage({ onLoginSuccess }) {
   };
 
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', bgcolor: 'background.default' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', bgcolor: 'background.default' }}>
       <Paper elevation={3} sx={{ p: 4, borderRadius: 4, width: '100%', maxWidth: '420px', textAlign: 'center' }}>
         {/* --- NEW: Logo is added here --- */}
         <Box sx={{ mb: 3 }}>
