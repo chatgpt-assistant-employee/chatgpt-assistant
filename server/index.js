@@ -488,6 +488,29 @@ const parseEmail = (header) => {
     return header;
 };
 
+const formatReplyForGoogleVoice = (replyText, recipientEmail) => {
+    // Check if the recipient is a phone number (Google Voice format)
+    const isPhoneNumber = recipientEmail.includes('@txt.voice.google.com') || 
+                         /^\d+@/.test(recipientEmail);
+    
+    if (!isPhoneNumber) {
+        // Regular email - keep normal formatting
+        return replyText;
+    }
+    
+    // For Google Voice: Format as continuous text with bullet separators for paragraphs
+    let formattedText = replyText
+        // Replace paragraph breaks (double newlines) with a separator
+        .replace(/\n\s*\n/g, ' • ')
+        // Replace single line breaks with spaces
+        .replace(/\n/g, ' ')
+        // Clean up multiple spaces
+        .replace(/\s+/g, ' ')
+        .trim();
+    
+    return formattedText;
+};
+
 // --- AUTOMATED FOLLOW-UP WORKER ---
 async function checkAndSendFollowUps() {
     console.log(`[${new Date().toISOString()}]  cron: Running follow-up check...`);
@@ -1342,7 +1365,7 @@ app.post('/google-push-notification', express.json(), async (req, res) => {
         const firstAddedMessage = addedMessages[0].message;
         const threadId = firstAddedMessage.threadId;
 
-        // --- THIS IS THE NEW LOGIC TO CANCEL FOLLOW-UPS ---
+        // Cancel any pending follow-ups for this thread
         console.log(`[automation] New message in thread ${threadId}. Cancelling any pending follow-ups.`);
         await prisma.emailLog.updateMany({
             where: {
@@ -1350,10 +1373,9 @@ app.post('/google-push-notification', express.json(), async (req, res) => {
                 assistantId: assistant.id,
             },
             data: {
-                followUpRequired: false, // Cancel the follow-up
+                followUpRequired: false,
             },
         });
-        // --- END OF NEW LOGIC ---
         
         const fullThread = await gmail.users.threads.get({ userId: 'me', id: threadId });
         const lastMessage = fullThread.data.messages.slice(-1)[0];
@@ -1435,14 +1457,17 @@ CLASSIFICATION:`;
             
             if (replyRun.status === 'completed') {
                 const messages = await openai.beta.threads.messages.list(replyRun.thread_id);
-                const replyText = messages.data[0].content[0].text.value;
+                let replyText = messages.data[0].content[0].text.value;
                 
                 // Get thread details for proper threading
                 const subject = lastMessage.payload.headers.find(h => h.name === 'Subject')?.value || '';
                 const fromHeader = lastMessage.payload.headers.find(h => h.name === 'From')?.value || '';
                 const finalRecipient = parseEmail(fromHeader);
                 
-                // ✅ FIXED: Get ALL Message-IDs from the thread for proper threading
+                // Format the reply text based on recipient type (phone number vs regular email)
+                const formattedReplyText = formatReplyForGoogleVoice(replyText, finalRecipient);
+                
+                // Get ALL Message-IDs from the thread for proper threading
                 const allMessageIds = fullThread.data.messages.map(msg => 
                     msg.payload.headers.find(h => h.name.toLowerCase() === 'message-id')?.value
                 ).filter(Boolean);
@@ -1466,9 +1491,17 @@ CLASSIFICATION:`;
                     } 
                 });
                 
-                const htmlBody = `<p>${replyText.replace(/\n/g, '<br>')}</p><img src="http://localhost:3001/track/open/${newLog.id}" width="1" height="1" alt="">`;
+                // For HTML, if it's a phone number, keep it simple. Otherwise, add line breaks
+                let htmlBody;
+                if (finalRecipient.includes('@txt.voice.google.com') || /^\d+@/.test(finalRecipient)) {
+                    // For Google Voice: simple HTML without complex formatting
+                    htmlBody = `<p>${formattedReplyText}</p><img src="http://localhost:3001/track/open/${newLog.id}" width="1" height="1" alt="">`;
+                } else {
+                    // For regular email: preserve line breaks in HTML
+                    htmlBody = `<p>${replyText.replace(/\n/g, '<br>')}</p><img src="http://localhost:3001/track/open/${newLog.id}" width="1" height="1" alt="">`;
+                }
                 
-                // ✅ FIXED: Proper email threading with correct headers
+                // Proper email threading with correct headers
                 const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
                 const rawMessageParts = [
                     `From: ${assistant.emailAddress}`,
@@ -1482,7 +1515,7 @@ CLASSIFICATION:`;
                     `--${boundary}`,
                     'Content-Type: text/plain; charset="UTF-8"',
                     '',
-                    replyText,
+                    formattedReplyText,  // Use formatted text here
                     '',
                     `--${boundary}`,
                     'Content-Type: text/html; charset="UTF-8"',
@@ -1495,7 +1528,7 @@ CLASSIFICATION:`;
                 const rawMessage = rawMessageParts.join('\r\n');
                 const encodedMessage = Buffer.from(rawMessage).toString('base64url');
                 
-                // ✅ CRITICAL: Send with threadId to keep in same conversation
+                // Send with threadId to keep in same conversation
                 const sentMessage = await gmail.users.messages.send({ 
                     userId: 'me', 
                     requestBody: { 
