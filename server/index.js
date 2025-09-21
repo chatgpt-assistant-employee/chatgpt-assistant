@@ -909,6 +909,28 @@ app.get('/auth/tiktok/callback', isVerified, async (req, res) => {
     }
 });
 
+app.post('/auth/tiktok/disconnect/:assistantId', isVerified, async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: 'Not authenticated' });
+    try {
+        const { assistantId } = req.params;
+        const assistant = await prisma.assistant.findUnique({ where: { id: assistantId } });
+
+        if (!assistant || assistant.userId !== req.session.userId) {
+            return res.status(403).json({ message: 'Permission denied.' });
+        }
+
+        // We don't need to revoke the token with TikTok, just remove it
+        await prisma.assistant.update({
+            where: { id: assistantId },
+            data: { tiktokTokens: null },
+        });
+
+        res.json({ message: 'TikTok account disconnected successfully.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to disconnect TikTok account.' });
+    }
+});
+
 
 app.post('/auth/login', async (req, res) => {
     try {
