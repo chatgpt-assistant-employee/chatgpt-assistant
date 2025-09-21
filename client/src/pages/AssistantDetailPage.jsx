@@ -29,7 +29,6 @@ import {
     DialogActions,
     Tooltip
 } from '@mui/material';
-import { FaTiktok } from 'react-icons/fa'; // A popular library for icons
 import { 
     Article as ArticleIcon, 
     Link as LinkIcon, 
@@ -48,6 +47,7 @@ import {
     Check as CheckIcon,
     Refresh as RefreshIcon
 } from '@mui/icons-material';
+import { FaTiktok } from 'react-icons/fa'; // A popular library for icons
 import AvatarGridPicker from '../components/AvatarGridPicker';
 import availableAvatars from '../constants/availableAvatars';
 
