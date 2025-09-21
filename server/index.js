@@ -844,6 +844,71 @@ app.post('/auth/reset-password', async (req, res) => {
     }
 });
 
+app.get('/auth/tiktok', isVerified, (req, res) => {
+    const { assistantId } = req.query;
+    if (!req.session.userId || !assistantId) {
+        return res.status(400).send('Missing user session or assistant ID');
+    }
+
+    // Construct the TikTok authorization URL
+    const csrfState = crypto.randomBytes(16).toString('hex');
+    req.session.tiktokAuthState = { state: csrfState, assistantId: assistantId };
+    
+    const tiktokAuthUrl = new URL('https://www.tiktok.com/v2/auth/authorize/');
+    tiktokAuthUrl.searchParams.append('client_key', process.env.TIKTOK_CLIENT_KEY);
+    tiktokAuthUrl.searchParams.append('scope', 'user.info.profile,comment.list,comment.create'); // Requesting the scopes we need
+    tiktokAuthUrl.searchParams.append('response_type', 'code');
+    tiktokAuthUrl.searchParams.append('redirect_uri', `${process.env.APP_URL}/auth/tiktok/callback`);
+    tiktokAuthUrl.searchParams.append('state', csrfState);
+
+    res.redirect(tiktokAuthUrl.toString());
+});
+
+// This route handles the redirect back from TikTok after the user approves
+app.get('/auth/tiktok/callback', isVerified, async (req, res) => {
+    try {
+        const { code, state } = req.query;
+        const { state: savedState, assistantId } = req.session.tiktokAuthState || {};
+
+        if (!code || !state || state !== savedState) {
+            return res.status(400).send('Invalid state or missing code from TikTok.');
+        }
+
+        // Exchange the code for an access token
+        const tokenResponse = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                client_key: process.env.TIKTOK_CLIENT_KEY,
+                client_secret: process.env.TIKTOK_CLIENT_SECRET,
+                code: code,
+                grant_type: 'authorization_code',
+                redirect_uri: `${process.env.APP_URL}/auth/tiktok/callback`,
+            }),
+        });
+
+        const tokens = await tokenResponse.json();
+        if (!tokenResponse.ok) throw new Error(tokens.error_description || 'Failed to get TikTok token.');
+
+        // Enforce the "Either/Or" rule
+        const assistant = await prisma.assistant.findUnique({ where: { id: assistantId } });
+        if (assistant.googleTokens) {
+            return res.redirect(`${process.env.FRONTEND_URL}/assistant/${assistantId}?error=already_connected_to_google`);
+        }
+
+        // Save the TikTok tokens to the assistant
+        await prisma.assistant.update({
+            where: { id: assistantId },
+            data: { tiktokTokens: tokens },
+        });
+
+        res.redirect(`${process.env.FRONTEND_URL}/assistant/${assistantId}`);
+    } catch (error) {
+        console.error("Error in TikTok callback:", error);
+        res.redirect(`${process.env.FRONTEND_URL}/assistants?error=tiktok_connection_failed`);
+    }
+});
+
 
 app.post('/auth/login', async (req, res) => {
     try {

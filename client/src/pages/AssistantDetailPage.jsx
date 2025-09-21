@@ -29,6 +29,7 @@ import {
     DialogActions,
     Tooltip
 } from '@mui/material';
+import { FaTiktok } from 'react-icons/fa'; // A popular library for icons
 import { 
     Article as ArticleIcon, 
     Link as LinkIcon, 
@@ -442,6 +443,15 @@ function AssistantDetailPage() {
         }
     };
 
+    const handleTikTokDisconnect = async () => {
+        if (window.confirm('Are you sure you want to disconnect this TikTok account?')) {
+            try {
+                await fetch(`${import.meta.env.VITE_API_URL}/auth/tiktok/disconnect/${id}`, { method: 'POST', credentials: 'include' });
+                fetchAssistantData();
+            } catch (error) { console.error("Failed to disconnect TikTok account:", error); }
+        }
+    };
+
     if (isLoading && !assistantData) {
         return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}><CircularProgress /></Box>;
     }
@@ -555,15 +565,23 @@ function AssistantDetailPage() {
 
                     <Divider sx={{ my: 2 }} />
 
-                    <Typography variant="h6" gutterBottom>Gmail Connection</Typography>
+                    <Typography variant="h6" gutterBottom>Platform Connection</Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                         {assistant.googleTokens ? (
                             <>
-                                <Button variant="contained" color="success" startIcon={<LinkIcon />}>Connected</Button>
-                                <Button variant="outlined" color="#beacdbff" size="small" onClick={handleGoogleDisconnect}>Disconnect</Button>
+                                <Button variant="contained" color="success" startIcon={<LinkIcon />}>Connected to Gmail</Button>
+                                <Button variant="outlined" color="secondary" size="small" onClick={handleGoogleDisconnect}>Disconnect</Button>
+                            </>
+                        ) : assistant.tiktokTokens ? (
+                            <>
+                                <Button variant="contained" sx={{ bgcolor: '#000', color: '#fff', '&:hover': { bgcolor: '#222' }}} startIcon={<FaTiktok />}>Connected to TikTok</Button>
+                                <Button variant="outlined" color="secondary" size="small" onClick={handleTikTokDisconnect}>Disconnect</Button>
                             </>
                         ) : (
-                            <Button variant="contained" startIcon={<LinkIcon />} href={`${import.meta.env.VITE_API_URL}/auth/google?assistantId=${assistant.id}`}>Connect Gmail</Button>
+                            <>
+                                <Button variant="contained" startIcon={<LinkIcon />} href={`${import.meta.env.VITE_API_URL}/auth/google?assistantId=${assistant.id}`}>Connect Gmail</Button>
+                                <Button variant="outlined" startIcon={<FaTiktok />} href={`${import.meta.env.VITE_API_URL}/auth/tiktok?assistantId=${assistant.id}`}>Connect TikTok</Button>
+                            </>
                         )}
                     </Box>
 
