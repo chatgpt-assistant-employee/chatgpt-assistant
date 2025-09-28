@@ -570,11 +570,17 @@ function AssistantDetailPage() {
                         {assistant.googleTokens ? (
                             <>
                                 <Button variant="contained" color="success" startIcon={<LinkIcon />}>Connected to Gmail</Button>
+                                <Typography variant="body2" color="text.secondary">
+                                    ({assistant.googleAccountEmail})
+                                </Typography>
                                 <Button variant="outlined" color="secondary" size="small" onClick={handleGoogleDisconnect}>Disconnect</Button>
                             </>
                         ) : assistant.tiktokTokens ? (
                             <>
                                 <Button variant="contained" sx={{ bgcolor: '#000', color: '#fff', '&:hover': { bgcolor: '#222' }}} startIcon={<FaTiktok />}>Connected to TikTok</Button>
+                                <Typography variant="body2" color="text.secondary">
+                                    (@{assistant.tiktokAccountUsername})
+                                </Typography>
                                 <Button variant="outlined" color="secondary" size="small" onClick={handleTikTokDisconnect}>Disconnect</Button>
                             </>
                         ) : (

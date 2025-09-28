@@ -899,7 +899,7 @@ app.get('/auth/tiktok/callback', isVerified, async (req, res) => {
         // Save the TikTok tokens to the assistant
         await prisma.assistant.update({
             where: { id: assistantId },
-            data: { tiktokTokens: tokens },
+            data: { tiktokTokens: tokens, tiktokAccountUsername: username, },
         });
 
         res.redirect(`${process.env.FRONTEND_URL}/assistant/${assistantId}`);
@@ -929,6 +929,76 @@ app.post('/auth/tiktok/disconnect/:assistantId', isVerified, async (req, res) =>
     } catch (error) {
         res.status(500).json({ message: 'Failed to disconnect TikTok account.' });
     }
+});
+
+// This new route will be used by the frontend to fetch comments for an assistant
+app.get('/api/tiktok/comments/:assistantId', isVerified, async (req, res) => {
+    const { assistantId } = req.params;
+    const assistant = await prisma.assistant.findUnique({ where: { id: assistantId } });
+
+    // Verify ownership and connection
+    if (!assistant || assistant.userId !== req.session.userId) {
+        return res.status(403).json({ message: 'Permission denied.' });
+    }
+    if (!assistant.tiktokTokens) {
+        return res.json([]); // Return empty if not connected
+    }
+
+    try {
+        // TODO: In the future, this will make a real API call to TikTok to get comments.
+        // For now, to allow frontend development, we return realistic dummy data.
+        const dummyComments = [
+            { id: 'tiktok_comment_1', from: '@sample_user_1', text: "This is a fantastic video! Can you tell me more about your setup?", videoTitle: "My New Studio Tour" },
+            { id: 'tiktok_comment_2', from: '@another_viewer', text: "How long did this take to make?", videoTitle: "Building a Desk from Scratch" },
+        ];
+        res.json(dummyComments);
+    } catch (error) {
+        console.error("Error fetching TikTok comments:", error);
+        res.status(500).json({ message: "Failed to fetch TikTok comments." });
+    }
+});
+
+// This new route will be used by the frontend to send a reply to a comment
+app.post('/api/send-tiktok-comment', isVerified, async (req, res) => {
+    const { assistantId, commentId, replyText } = req.body;
+    const assistant = await prisma.assistant.findUnique({ where: { id: assistantId } });
+
+    // Verify ownership and connection
+    if (!assistant || assistant.userId !== req.session.userId) {
+        return res.status(403).json({ message: 'Permission denied.' });
+    }
+    if (!assistant.tiktokTokens) {
+        return res.status(400).json({ message: 'This assistant is not connected to TikTok.' });
+    }
+
+    try {
+        // TODO: This is where the real API call to TikTok to post a comment will go.
+        // This will only work after your developer app is approved for the comment.write scope.
+        console.log(`--- TIKTOK API SIMULATION ---`);
+        console.log(`Replying to comment ID: ${commentId}`);
+        console.log(`With text: "${replyText}"`);
+        console.log(`Using tokens for assistant: ${assistantId}`);
+        console.log(`--- END SIMULATION ---`);
+        
+        // For the demo video, we send a success message immediately.
+        res.json({ message: 'Comment reply sent successfully (Simulation).' });
+
+    } catch (error) {
+        console.error("Error sending TikTok reply:", error);
+        res.status(500).json({ message: "Failed to send TikTok reply." });
+    }
+});
+
+
+// === NEW: TIKTOK WEBHOOK PLACEHOLDER ===
+app.post('/tiktok-webhook', express.json(), (req, res) => {
+    console.log('TikTok webhook notification received:');
+    console.log(JSON.stringify(req.body, null, 2));
+
+    // TODO: Add logic here to process real-time comment notifications from TikTok
+    // and trigger the AI reply automation.
+    
+    res.status(200).send('OK');
 });
 
 
@@ -2383,6 +2453,7 @@ app.get('/auth/google/callback', isVerified, async (req, res) => {
             data: { 
                 googleTokens: tokens,
                 emailAddress: emailAddress,
+                googleAccountEmail: emailAddress,
             }
         });
 

@@ -57,7 +57,9 @@ model Assistant {
   // Each assistant has its own OpenAI ID and Google connection
   openaiAssistantId String    @unique
   googleTokens      Json?
+  googleAccountEmail  String?
   tiktokTokens      Json?
+  tiktokAccountUsername String?
   emailAddress      String?
 
   googleHistoryId     String? // Tracks the last known state of the inbox
