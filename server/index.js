@@ -406,6 +406,8 @@ app.use((req, res, next) => {
 
 app.use(cookieParser());
 
+app.set('trust proxy', 1); // <-- ADD THIS LINE
+
 app.use(session({
     secret: process.env.SESSION_SECRET || 'a_very_secret_key_for_sessions_replace_this_for_production',
     resave: false,
